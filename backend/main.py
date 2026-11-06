@@ -2,10 +2,14 @@
 # Start it from the project folder with:
 #   .venv\Scripts\python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 
+from concurrent.futures import ThreadPoolExecutor
+
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
+from backend.malwarebazaar import lookup_malwarebazaar
+from backend.threatfox import lookup_threatfox
 from backend.virustotal import lookup_virustotal
 
 # Read the API keys from the .env file into os.environ (once, when the backend starts)
@@ -16,6 +20,13 @@ app = FastAPI(title="hash-enrich-2")
 HEX_CHARACTERS = "0123456789abcdef"
 HASH_TYPES = {32: "md5", 40: "sha1", 64: "sha256"}
 
+# Every source we ask: its name in the response -> the function that looks it up
+SOURCES = {
+    "virustotal": lookup_virustotal,
+    "malwarebazaar": lookup_malwarebazaar,
+    "threatfox": lookup_threatfox,
+}
+
 
 # Return "md5", "sha1" or "sha256" for a valid lowercase hash, or None if it is not valid.
 def get_hash_type(file_hash):
@@ -25,6 +36,23 @@ def get_hash_type(file_hash):
         if character not in HEX_CHARACTERS:
             return None
     return HASH_TYPES[len(file_hash)]
+
+
+# Ask all sources at the same time (one thread each) and collect their results.
+# If one source crashes, only that source shows an error; the others still answer.
+def ask_all_sources(file_hash):
+    results = {}
+    with ThreadPoolExecutor() as pool:
+        # Start every lookup without waiting for the previous one to finish
+        running = {name: pool.submit(lookup, file_hash) for name, lookup in SOURCES.items()}
+        # Now wait for each one and store its answer
+        for name, job in running.items():
+            try:
+                results[name] = job.result()
+            except Exception as problem:
+                results[name] = {"status": "error", "data": None,
+                                 "error": f"Unexpected problem: {type(problem).__name__}"}
+    return results
 
 
 # Health check: lets you (or a script) see that the backend is running.
@@ -44,7 +72,5 @@ def lookup_hash(file_hash: str):
     return {
         "hash": file_hash,
         "hash_type": hash_type,
-        "sources": {
-            "virustotal": lookup_virustotal(file_hash),
-        },
+        "sources": ask_all_sources(file_hash),
     }
