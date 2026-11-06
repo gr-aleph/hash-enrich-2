@@ -1,16 +1,12 @@
-# Functions that look up a hash at each source.
-# For each source there are two functions:
-#   lookup_...  sends the request over the internet
-#   parse_...   turns (status_code, json_body) into a result dict (easy to test)
+# VirusTotal: look up a file hash.
+#   lookup_virustotal  sends the request over the internet
+#   parse_virustotal   turns (status_code, json_body) into a result dict (easy to test)
+# The API key comes from VT_API_KEY (main.py loads it from .env).
 
 import os
 from datetime import datetime, timezone
 
 import requests
-from dotenv import load_dotenv
-
-# Read the API keys from the .env file into os.environ
-load_dotenv()
 
 TIMEOUT_SECONDS = 10
 

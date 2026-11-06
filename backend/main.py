@@ -2,10 +2,14 @@
 # Start it from the project folder with:
 #   .venv\Scripts\python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from backend.sources import lookup_virustotal
+from backend.virustotal import lookup_virustotal
+
+# Read the API keys from the .env file into os.environ (once, when the backend starts)
+load_dotenv()
 
 app = FastAPI(title="hash-enrich-2")
 
