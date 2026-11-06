@@ -1,0 +1,9 @@
+# Secret API keys - never commit this file
+.env
+
+# Python virtual environment (installed packages)
+.venv/
+
+# Files Python and pytest create automatically
+__pycache__/
+.pytest_cache/
