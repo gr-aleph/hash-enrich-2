@@ -1,0 +1,9 @@
+{
+  "status_code": 401,
+  "body": {
+    "error": {
+      "code": "WrongCredentialsError",
+      "message": "Wrong API key"
+    }
+  }
+}

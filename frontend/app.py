@@ -8,7 +8,7 @@ import streamlit as st
 BACKEND_URL = "http://127.0.0.1:8000"
 TIMEOUT_SECONDS = 15  # a bit longer than the backend's 10 second source timeout
 
-SOURCE_NAMES = {"virustotal": "VirusTotal"}
+SOURCE_NAMES = {"virustotal": "VirusTotal", "malwarebazaar": "MalwareBazaar", "threatfox": "ThreatFox"}
 
 
 # Ask the backend about a hash. Returns (status_code, body), or (None, None) if the backend is down.
@@ -30,11 +30,37 @@ def show_virustotal(data):
     st.markdown(f"[Open on VirusTotal]({data['link']})")
 
 
+# Show the MalwareBazaar details on the page.
+def show_malwarebazaar(data):
+    st.write(f"**Signature:** {data['signature']}")
+    st.write(f"**File type:** {data['file_type']}")
+    st.write(f"**Tags:** {', '.join(data['tags'])}")
+    st.write(f"**First seen:** {data['first_seen']}  |  **Last seen:** {data['last_seen']}")
+    st.write(f"**Origin country:** {data['origin_country']}")
+
+
+# Show the ThreatFox details on the page (one line per match).
+def show_threatfox(data):
+    for match in data["matches"]:
+        st.write(f"**{match['malware_printable']}** ({match['threat_type']}), "
+                 f"confidence {match['confidence_level']}%, first seen {match['first_seen']}")
+        if match["malpedia"]:
+            st.markdown(f"[Malpedia page]({match['malpedia']})")
+
+
+# Which function shows the details of which source
+SHOW_FUNCTIONS = {
+    "virustotal": show_virustotal,
+    "malwarebazaar": show_malwarebazaar,
+    "threatfox": show_threatfox,
+}
+
+
 # Show one source's section: its status, then its details or its error.
 def show_source(key, result):
     st.subheader(SOURCE_NAMES[key])
     if result["status"] == "ok":
-        show_virustotal(result["data"])
+        SHOW_FUNCTIONS[key](result["data"])
     elif result["status"] == "not_found":
         st.info("Not found. This does not mean the file is safe.")
     else:

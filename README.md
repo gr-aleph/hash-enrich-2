@@ -1,7 +1,8 @@
 # hash-enrich-2
 
-Type a file hash (MD5, SHA-1 or SHA-256) on a web page and see what VirusTotal knows
-about it. MalwareBazaar and ThreatFox are added in Milestone 2.
+Type a file hash (MD5, SHA-1 or SHA-256) on a web page and see what VirusTotal,
+MalwareBazaar and ThreatFox know about it, on one page. If one source fails (bad key,
+rate limit, offline), the page still shows the other two.
 
 The app only **looks up hashes**. It never uploads files. Lookups are not private, so do not
 look up hashes of internal files.
@@ -26,7 +27,9 @@ notepad .env
 In Notepad, replace the placeholders with your own keys and save:
 
 - `VT_API_KEY`: from your VirusTotal account (free key: 4 lookups/minute, 500/day)
-- `ABUSECH_AUTH_KEY`: from https://auth.abuse.ch/ (used from Milestone 2)
+- `ABUSECH_AUTH_KEY`: from https://auth.abuse.ch/ (one key covers MalwareBazaar and ThreatFox)
+
+Paste each key right after the `=`, with no spaces or quote marks.
 
 `.env` is listed in `.gitignore`, so Git never commits it. Never paste a key into a code file.
 
@@ -69,15 +72,29 @@ Test hashes:
 
 | Hash | Expected |
 |---|---|
-| `add97f691f8bd8af5efe0480a90f12bcdcfa089f7432088b4ff8bd0606ff58de` | Mirai sample, found |
-| `44d88612fea8a8f36de82e1278abb02f` | EICAR test file, found on VirusTotal |
-| `0000000000000000000000000000000000000000000000000000000000000000` | not found |
+| `add97f691f8bd8af5efe0480a90f12bcdcfa089f7432088b4ff8bd0606ff58de` | Mirai sample, found by all three |
+| `44d88612fea8a8f36de82e1278abb02f` | EICAR test file, found on VirusTotal only |
+| `0000000000000000000000000000000000000000000000000000000000000000` | not found anywhere |
+
+## Run the tests
+
+The tests use saved replies in `tests/fixtures`, so they need no internet and no API keys
+(they pass with Wi-Fi off):
+
+```
+.venv\Scripts\python -m pytest -v
+```
+
+You should see `14 passed`. A warning about `httpx2` is expected and harmless.
 
 ## Project files
 
 | File | What it does |
 |---|---|
-| `backend/main.py` | FastAPI app: `/api/v1/health` and `/api/v1/hash/{hash}` |
-| `backend/sources.py` | Calls each source and turns its reply into a result |
+| `backend/main.py` | FastAPI app: `/api/v1/health` and `/api/v1/hash/{hash}`; asks all sources at the same time |
+| `backend/virustotal.py` | Calls VirusTotal and turns its reply into a result |
+| `backend/malwarebazaar.py` | Same for MalwareBazaar |
+| `backend/threatfox.py` | Same for ThreatFox |
 | `frontend/app.py` | The Streamlit page |
+| `tests/` | pytest tests and saved replies |
 | `.streamlit/config.toml` | Keeps the page local (127.0.0.1) |
