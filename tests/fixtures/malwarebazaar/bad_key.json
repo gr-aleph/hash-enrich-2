@@ -1,0 +1,6 @@
+{
+  "status_code": 403,
+  "body": {
+    "query_status": "unknown_auth_key"
+  }
+}

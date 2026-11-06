@@ -1,0 +1,32 @@
+{
+  "status_code": 200,
+  "body": {
+    "query_status": "ok",
+    "data": [
+      {
+        "id": "2016402",
+        "ioc": "add97f691f8bd8af5efe0480a90f12bcdcfa089f7432088b4ff8bd0606ff58de",
+        "threat_type": "payload",
+        "threat_type_desc": "Indicator that identifies a malware sample (payload)",
+        "ioc_type": "sha256_hash",
+        "ioc_type_desc": "SHA256 hash of a malware sample (payload)",
+        "malware": "elf.mirai",
+        "malware_printable": "Mirai",
+        "malware_alias": "Katana",
+        "malware_malpedia": "https://malpedia.caad.fkie.fraunhofer.de/details/elf.mirai",
+        "confidence_level": 90,
+        "is_compromised": false,
+        "first_seen": "2026-11-05 19:57:10 UTC",
+        "last_seen": null,
+        "reference": null,
+        "reporter": "Tuxxin",
+        "sightings": 1,
+        "tags": [
+          "elf",
+          "Mirai"
+        ],
+        "malware_samples": []
+      }
+    ]
+  }
+}

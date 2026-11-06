@@ -1,0 +1,9 @@
+{
+  "status_code": 404,
+  "body": {
+    "error": {
+      "code": "NotFoundError",
+      "message": "File \"0000000000000000000000000000000000000000000000000000000000000000\" not found"
+    }
+  }
+}
