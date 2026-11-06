@@ -1,0 +1,3 @@
+# Only this computer can open the page (not others on the network)
+[server]
+address = "127.0.0.1"
