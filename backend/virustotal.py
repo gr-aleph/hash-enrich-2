@@ -60,7 +60,8 @@ def lookup_virustotal(file_hash):
     try:
         reply = requests.get(url, headers={"x-apikey": key}, timeout=TIMEOUT_SECONDS)
         return parse_virustotal(reply.status_code, reply.json())
-    except requests.RequestException as problem:
-        return make_result("error", error=f"Could not reach VirusTotal: {type(problem).__name__}")
+    # ValueError must come first: a bad JSON reply counts as both kinds of problem
     except ValueError:
         return make_result("error", error="VirusTotal sent a reply that is not JSON")
+    except requests.RequestException as problem:
+        return make_result("error", error=f"Could not reach VirusTotal: {type(problem).__name__}")

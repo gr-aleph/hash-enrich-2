@@ -56,7 +56,8 @@ def lookup_threatfox(file_hash):
     try:
         reply = requests.post(URL, json=question, headers={"Auth-Key": key}, timeout=TIMEOUT_SECONDS)
         return parse_threatfox(reply.status_code, reply.json())
-    except requests.RequestException as problem:
-        return make_result("error", error=f"Could not reach ThreatFox: {type(problem).__name__}")
+    # ValueError must come first: a bad JSON reply counts as both kinds of problem
     except ValueError:
         return make_result("error", error="ThreatFox sent a reply that is not JSON")
+    except requests.RequestException as problem:
+        return make_result("error", error=f"Could not reach ThreatFox: {type(problem).__name__}")
