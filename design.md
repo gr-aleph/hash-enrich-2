@@ -22,10 +22,11 @@ Browser -> Streamlit page (127.0.0.1:8501) -> FastAPI backend (127.0.0.1:8000) -
 
 | File | What it does |
 |---|---|
-| `backend/main.py` | FastAPI app: `/api/v1/health` and `/api/v1/hash/{hash}` |
-| `backend/sources.py` | Per source: a `lookup_...` function (calls the API) and a `parse_...` function (turns the reply into a result) |
+| `backend/main.py` | FastAPI app: `/api/v1/health` and `/api/v1/hash/{hash}`; loads `.env`; asks all sources at the same time |
+| `backend/virustotal.py`, `malwarebazaar.py`, `threatfox.py` | One file per source, each with a `lookup_...` function (calls the API) and a `parse_...` function (turns the reply into a result) |
 | `frontend/app.py` | The Streamlit page |
-| `tests/` | pytest tests and saved JSON replies (Milestone 2) |
+| `tests/` | pytest tests; saved replies in `tests/fixtures/<source>/{hit,unknown,bad_key}.json` |
+| `pytest.ini` | Lets tests import `backend` from the project folder |
 | `.env` | API keys (`VT_API_KEY`, `ABUSECH_AUTH_KEY`). In `.gitignore`, never committed |
 | `.env.example` | Same names with placeholder values |
 | `.streamlit/config.toml` | Makes the page listen on 127.0.0.1 only |
@@ -33,6 +34,11 @@ Browser -> Streamlit page (127.0.0.1:8501) -> FastAPI backend (127.0.0.1:8000) -
 Style: plain functions and dicts, `requests` library, no classes, no async, no Pydantic.
 Files stay under ~120 lines with a plain-English comment above each function.
 Fixed settings (backend address, 10 second timeout) are constants at the top of the file.
+
+Calling sources at the same time: `main.py` keeps a `SOURCES` dict (name -> lookup function)
+and runs every lookup in its own thread with `ThreadPoolExecutor`, so the wait is about the
+slowest source, not all three added up. If a lookup crashes, `main.py` turns that into an
+`error` for that source only.
 
 ## API
 
@@ -86,10 +92,20 @@ One abuse.ch key covers MalwareBazaar and ThreatFox. ThreatFox uses `search_ioc`
 - The repository is public: a committed key counts as stolen. Revoke it and make a new one.
 - Lookups are not private. Never look up hashes of internal files.
 
-## Testing (Milestone 2)
+## Testing
 
 pytest tests the `parse_...` functions and the API endpoint with saved JSON replies
-(a hit, an unknown hash and an error for each source). No network, no keys, no mocking libraries.
+(a hit, an unknown hash and a bad key for each source). No network, no keys, no mocking libraries.
+
+- Saved replies have the shape `{"status_code": ..., "body": ...}`, with no request headers and
+  no keys. abuse.ch replies are real recordings; the VirusTotal bad-key reply was recorded with
+  the fake key `not-a-real-key`.
+- `tests/test_parse.py`: 9 tests, 3 per source.
+- `tests/test_api.py`: 5 tests (health, 400, all found, one failing source doesn't hide the
+  others, a crashing lookup becomes an error). They replace the entries in `main.SOURCES` with
+  fakes using pytest's built-in `monkeypatch`, so no source is ever called.
+- Known warning: Starlette says its test client will move from `httpx` to `httpx2`. Tests still
+  pass; revisit when upgrading.
 
 Test hashes: Mirai `add97f691f8bd8af5efe0480a90f12bcdcfa089f7432088b4ff8bd0606ff58de` (all three),
 EICAR `44d88612fea8a8f36de82e1278abb02f` (VirusTotal only), 64 zeros (unknown everywhere).
