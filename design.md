@@ -40,6 +40,14 @@ and runs every lookup in its own thread with `ThreadPoolExecutor`, so the wait i
 slowest source, not all three added up. If a lookup crashes, `main.py` turns that into an
 `error` for that source only.
 
+Time limits: each request uses `timeout=10`, but in `requests` that limits each wait for data,
+not the whole request, so a source can take longer. `main.py` therefore waits at most
+`TOTAL_WAIT_SECONDS = 12` for all sources together (`concurrent.futures.wait`); a source still
+busy then gets `error` "Took longer than 12 seconds" and the others are returned at once.
+The page waits 20 s, longer than that limit, and shows a different message for each problem:
+"Backend not running" (no connection), "took longer than 20 seconds" (timeout),
+"unexpected reply" (not JSON), or the backend's error for any reply other than 200.
+
 ## API
 
 `GET /api/v1/health` -> `200 {"status": "ok"}`
@@ -108,8 +116,12 @@ pytest tests the `parse_...` functions and the API endpoint with saved JSON repl
   replaced with a fake that records what it was asked to send. Checks: a missing key sends
   nothing; the address, headers, body and 10 s timeout are the documented ones; a timeout,
   no connection and a non-JSON reply each give their error message.
-- `tests/test_main.py`: 5 tests (md5/sha1/sha256 by length, wrong lengths and non-hex rejected,
-  an invalid hash calls no source, the three sources are asked at the same time).
+- `tests/test_main.py`: 6 tests (md5/sha1/sha256 by length, wrong lengths and non-hex rejected,
+  an invalid hash calls no source, the three sources are asked at the same time, a slow source
+  gets "Took longer" while the others still answer).
+- `tests/test_frontend.py`: 5 tests using Streamlit's built-in `AppTest` (runs the page without
+  a browser) with `requests.get` faked: backend down, backend too slow, invalid hash, a 404
+  reply doesn't crash the page, one failed source still shows all three sections.
 - Known warning: Starlette says its test client will move from `httpx` to `httpx2`. Tests still
   pass; revisit when upgrading.
 
