@@ -2,7 +2,7 @@
 # Start it from the project folder with:
 #   .venv\Scripts\python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -19,6 +19,7 @@ app = FastAPI(title="hash-enrich-2")
 
 HEX_CHARACTERS = "0123456789abcdef"
 HASH_TYPES = {32: "md5", 40: "sha1", 64: "sha256"}
+TOTAL_WAIT_SECONDS = 12  # longest the backend waits for the sources, all together
 
 # Every source we ask: its name in the response -> the function that looks it up
 SOURCES = {
@@ -39,19 +40,28 @@ def get_hash_type(file_hash):
 
 
 # Ask all sources at the same time (one thread each) and collect their results.
+# We wait at most TOTAL_WAIT_SECONDS. A source that is still busy then gets an error,
+# so one slow source never holds back the others.
 # If one source crashes, only that source shows an error; the others still answer.
 def ask_all_sources(file_hash):
     results = {}
-    with ThreadPoolExecutor() as pool:
-        # Start every lookup without waiting for the previous one to finish
-        running = {name: pool.submit(lookup, file_hash) for name, lookup in SOURCES.items()}
-        # Now wait for each one and store its answer
-        for name, job in running.items():
-            try:
-                results[name] = job.result()
-            except Exception as problem:
-                results[name] = {"status": "error", "data": None,
-                                 "error": f"Unexpected problem: {type(problem).__name__}"}
+    pool = ThreadPoolExecutor()
+    # Start every lookup without waiting for the previous one to finish
+    running = {name: pool.submit(lookup, file_hash) for name, lookup in SOURCES.items()}
+    # Wait at most TOTAL_WAIT_SECONDS, then see which lookups are done
+    finished, not_finished = wait(running.values(), timeout=TOTAL_WAIT_SECONDS)
+    for name, job in running.items():
+        if job in not_finished:
+            results[name] = {"status": "error", "data": None,
+                             "error": f"Took longer than {TOTAL_WAIT_SECONDS} seconds"}
+            continue
+        try:
+            results[name] = job.result()
+        except Exception as problem:
+            results[name] = {"status": "error", "data": None,
+                             "error": f"Unexpected problem: {type(problem).__name__}"}
+    # Answer now; a slow lookup may still finish in the background, and its result is ignored
+    pool.shutdown(wait=False)
     return results
 
 
