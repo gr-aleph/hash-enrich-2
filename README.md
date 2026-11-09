@@ -85,7 +85,7 @@ The tests use saved replies in `tests/fixtures`, so they need no internet and no
 .venv\Scripts\python -m pytest -v
 ```
 
-You should see `46 passed`. A warning about `httpx2` is expected and harmless.
+You should see `68 passed`. If you have not installed the MCP server's packages, the 22 MCP tests are skipped and you see `46 passed, 3 skipped` (3 test files skipped). A warning about `httpx2` is expected and harmless.
 
 ## Caching
 
@@ -99,6 +99,35 @@ new field and no header. The cache is empty again when the backend restarts.
 A fixed list of 24 lookups with a fake web (no keys, no quota) caused 66 outbound requests without the
 cache and 18 with it (VirusTotal 22 to 5, MalwareBazaar 22 to 5, ThreatFox 22 to 8). Details in design.md.
 
+## MCP server (use the portal from Claude Desktop)
+
+The MCP server lets Claude Desktop look up a hash through the portal. The portal must be running
+(see "Run"). The server needs one more package:
+
+```
+.venv\Scripts\pip install -r mcp_server\requirements.txt
+```
+
+Add this to `claude_desktop_config.json` (Claude Desktop, Settings, Developer, Edit Config; keep any other
+settings in the file) and change the two paths to yours (full paths, not relative):
+
+```
+{
+  "mcpServers": {
+    "hash-portal": {
+      "command": "C:\\path\\to\\hash-enrich-2\\.venv\\Scripts\\python.exe",
+      "args": ["C:\\path\\to\\hash-enrich-2\\mcp_server\\server.py"],
+      "env": { "PORTAL_URL": "http://127.0.0.1:8000" }
+    }
+  }
+}
+```
+
+On a Mac the command is `/path/to/hash-enrich-2/.venv/bin/python`. Quit Claude Desktop completely and open
+it again. Then ask, for example: "Look up this hash: add97f691f8bd8af5efe0480a90f12bcdcfa089f7432088b4ff8bd0606ff58de".
+The server holds no API key; the keys stay in the portal's `.env`. Lookups go to outside services, so never
+ask about hashes of internal files. Details: [design.md](design.md), section "MCP server".
+
 ## Project files
 
 | File | What it does |
@@ -109,5 +138,6 @@ cache and 18 with it (VirusTotal 22 to 5, MalwareBazaar 22 to 5, ThreatFox 22 to
 | `backend/threatfox.py` | Same for ThreatFox |
 | `backend/cache.py` | The in-memory cache (what is kept, and for how long) |
 | `frontend/app.py` | The Streamlit page |
+| `mcp_server/` | The MCP server (one tool) and its requirements |
 | `tests/` | pytest tests and saved replies |
 | `.streamlit/config.toml` | Keeps the page local (127.0.0.1) |

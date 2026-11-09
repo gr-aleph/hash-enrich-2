@@ -1,0 +1,24 @@
+{
+  "status_code": 200,
+  "body": {
+    "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "hash_type": "sha256",
+    "sources": {
+      "virustotal": {
+        "status": "not_found",
+        "data": null,
+        "error": null
+      },
+      "malwarebazaar": {
+        "status": "not_found",
+        "data": null,
+        "error": null
+      },
+      "threatfox": {
+        "status": "not_found",
+        "data": null,
+        "error": null
+      }
+    }
+  }
+}
