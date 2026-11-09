@@ -5,7 +5,7 @@
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Response
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from backend import cache
@@ -41,21 +41,18 @@ def get_hash_type(file_hash):
 
 
 # Ask all sources at the same time (one thread each) and collect their results.
-# A source whose answer is already in the cache (cache.py) is not asked again. If you pass in a
-# dictionary as `ages`, it is filled with {source: seconds since the cached answer was fetched}.
+# A source whose answer is already in the cache (cache.py) is not asked again.
 # We wait at most TOTAL_WAIT_SECONDS. A source that is still busy then gets an error,
 # so one slow source never holds back the others.
 # If one source crashes, only that source shows an error; the others still answer.
-def ask_all_sources(file_hash, ages=None):
+def ask_all_sources(file_hash):
     results = {}
     pool = ThreadPoolExecutor()
     running = {}
     for name, lookup in SOURCES.items():
         cached = cache.get(name, file_hash)
         if cached is not None:
-            results[name], age = cached
-            if ages is not None:
-                ages[name] = age
+            results[name] = cached
         else:
             # Start every lookup without waiting for the previous one to finish
             running[name] = pool.submit(lookup, file_hash)
@@ -87,21 +84,14 @@ def health():
 
 # Look up one hash and return what each source knows about it.
 @app.get("/api/v1/hash/{file_hash}")
-def lookup_hash(file_hash: str, response: Response):
+def lookup_hash(file_hash: str):
     file_hash = file_hash.lower()
     hash_type = get_hash_type(file_hash)
     if hash_type is None:
         return JSONResponse(status_code=400, content={"error": "Expected 32, 40 or 64 hex characters"})
 
-    ages = {}
-    sources = ask_all_sources(file_hash, ages)
-    # Say which sources came from the cache, one header each, e.g.  X-Cache-Age-virustotal: 412
-    # (fetched 412 seconds ago). A source with no such header was just fetched.
-    # The answer's body does not change. See design.md, section "Caching".
-    for name, age in ages.items():
-        response.headers[f"X-Cache-Age-{name}"] = str(age)
     return {
         "hash": file_hash,
         "hash_type": hash_type,
-        "sources": sources,
+        "sources": ask_all_sources(file_hash),
     }

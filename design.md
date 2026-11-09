@@ -28,7 +28,6 @@ Browser -> Streamlit page (127.0.0.1:8501) -> FastAPI backend (127.0.0.1:8000) -
 | `backend/cache.py` | A small in-memory cache for source results, one expiry per source (see "Caching") |
 | `frontend/app.py` | The Streamlit page |
 | `tests/` | pytest tests; saved replies in `tests/fixtures/<source>/{hit,unknown,bad_key}.json` |
-| `bench/run_benchmark.py` | Counts the outbound requests of one fixed list of lookups, before and after the cache (see "Caching") |
 | `pytest.ini` | Lets tests import `backend` from the project folder |
 | `.env` | API keys (`VT_API_KEY`, `ABUSECH_AUTH_KEY`). In `.gitignore`, never committed |
 | `.env.example` | Same names with placeholder values |
@@ -142,24 +141,20 @@ possible choice, with no new dependency and no database. Costs: it is empty agai
 and two backend processes would not share it. It holds at most 5000 entries (expired ones are dropped first,
 then the oldest). Two identical requests arriving at the same moment both ask the sources; that is accepted.
 
-**Telling a cached result from a fresh one.** Results can be kept for up to 6 hours, and a cached "not found"
-or clean-looking answer can be wrong later (the file gets submitted, engines update), so the analyst must be
-able to see that a result is not fresh. For each source that came from the cache the backend sends a response
-header `X-Cache-Age-<source>` (`virustotal`, `malwarebazaar` or `threatfox`) with the seconds since it was
-fetched, for example `X-Cache-Age-virustotal: 412`. A source with no such header was just fetched. The page
-shows "Cached result, fetched 7 min ago. It may have changed since." under that source. The information is
-in headers and not in the JSON body because the body is the API that other programs depend on, and it stays
-exactly as the API section describes it. Cost: a client that reads only the body cannot see that a result is
-cached. These headers are an addition and are documented here, not in the API section.
+**Telling the analyst a result may be old.** Results can be kept for up to 6 hours, and a cached "not found"
+or clean-looking answer can be wrong later (the file gets submitted, engines update). The page therefore shows
+one fixed note under the results: "Results may be up to 30 min (VirusTotal), 6 h (MalwareBazaar) or 1 h
+(ThreatFox) old." The backend adds nothing to its answer (no new field and no header), so the API is exactly
+as the API section describes it. Cost: the page does not say which result was cached, only how old one can be.
+A test checks that the note matches the expiry times in `backend/cache.py`.
 
 **What did not change.** The JSON body, every field, the status codes, and the order of the sources. A valid
 hash still always gets 200. An invalid hash still gets 400 before the cache or any source is touched.
 
-**Measured.** `bench/run_benchmark.py` sends the same 24 lookups through the app before and after the cache
-(22 valid lookups: repeats, one hash in three spellings (lower case, UPPER CASE, mixed case), hashes known to nobody, one hash for which ThreatFox
-fails every time, and 2 invalid inputs that get a 400). A fake replaces `requests.get` and `requests.post` and
-answers from `tests/fixtures`, real network connections are switched off and the keys are dummy values, so no
-real quota is spent. It counts the outbound requests each source would have received:
+**Measured.** One fixed list of 24 lookups (22 valid: repeats, one hash in three spellings, hashes known to
+nobody, one hash for which ThreatFox fails every time, and 2 invalid inputs that get a 400) was sent through the
+app with a fake instead of `requests.get` and `requests.post`, so no real quota was spent. It counted the outbound
+requests each source would have received:
 
 | Source | Without the cache | With the cache |
 |---|---|---|
@@ -169,8 +164,9 @@ real quota is spent. It counts the outbound requests each source would have rece
 | **Total** | **66** | **18** |
 
 ThreatFox is higher than the others because its error on the 4 lookups of the failing hash is never cached,
-so each one asks again. `compare` checks that every answer (its exact text) is the same before and after.
-The run does not move time, so expiry is shown by the tests in `tests/test_cache.py` (a fake clock), not by the run.
+so each one asks again. The script that produced these numbers is not part of the repository (it could not run
+on Windows with Python 3.14, and it was over the file-size limit); the numbers are in the pull request. Expiry
+is shown by the tests in `tests/test_cache.py` (a fake clock).
 
 ## Testing
 
@@ -194,10 +190,12 @@ pytest tests the `parse_...` functions and the API endpoint with saved JSON repl
 - `tests/test_frontend.py`: 5 tests using Streamlit's built-in `AppTest` (runs the page without
   a browser) with `requests.get` faked: backend down, backend too slow, invalid hash, a 404
   reply doesn't crash the page, one failed source still shows all three sections.
-- `tests/test_cache.py`: 6 tests, with fake lookups that count their calls (a miss, a hit, an
-  expired entry using a fake clock, an error that is not cached, spellings share one entry while
-  different hashes and sources never do, the answer body is the same on a miss, a hit and a
-  partial hit). `tests/conftest.py` empties the cache before every test.
+- `tests/test_cache.py`: tests with fake lookups that count their calls (a miss, a hit, an expired
+  entry using a fake clock, an error that is not cached, "not found" is cached, "not found" expires
+  sooner than a found answer for each source, the cache never holds more than `MAX_ENTRIES`,
+  spellings share one entry while different hashes and sources never do, the answer body is the same
+  on a miss, a hit and a partial hit, the page note matches the expiry times). `tests/conftest.py`
+  empties the cache before every test.
 - Known warning: Starlette says its test client will move from `httpx` to `httpx2`. Tests still
   pass; revisit when upgrading.
 
@@ -216,6 +214,6 @@ with Wi-Fi off; README updated; merged by pull request.
 
 **Milestone 3** (branch `feat/caching`): each source's results are cached in memory with its own expiry
 and reasons (see "Caching"); an error is never cached; one hash typed differently uses one entry; the page
-shows when a result is cached; the JSON body and the API section are unchanged; the existing tests pass
-unchanged and new tests show a hit, a miss, an expiry and an uncached error; a fixed run of 24 lookups is
-counted before and after; merged by pull request that the owner reviews.
+shows a fixed note about how old a result can be; the JSON body and the API section are unchanged; the existing tests pass
+unchanged and new tests show a hit, a miss, an expiry, a cached not-found with its shorter expiry and an uncached error; a fixed run of 24 lookups was
+counted before and after (numbers kept, script not in the repo); merged by pull request that the owner reviews.

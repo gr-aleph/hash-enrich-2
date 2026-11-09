@@ -8,45 +8,26 @@ import streamlit as st
 BACKEND_URL = "http://127.0.0.1:8000"
 TIMEOUT_SECONDS = 20  # longer than the backend's 12 second limit, so the backend answers first
 
+# The backend keeps answers for a while (design.md, section "Caching"), so a result can be this old.
+CACHE_NOTE = "Results may be up to 30 min (VirusTotal), 6 h (MalwareBazaar) or 1 h (ThreatFox) old."
+
 SOURCE_NAMES = {"virustotal": "VirusTotal", "malwarebazaar": "MalwareBazaar", "threatfox": "ThreatFox"}
 
 
 # Ask the backend about a hash.
-# Returns (status_code, body, ages) when the backend answered, where ages says which sources
-# came from the backend's cache (see cache_ages below),
-# or (None, message, {}) with a message that says what went wrong.
+# Returns (status_code, body) when the backend answered,
+# or (None, message) with a message that says what went wrong.
 def ask_backend(file_hash):
     try:
         reply = requests.get(f"{BACKEND_URL}/api/v1/hash/{file_hash}", timeout=TIMEOUT_SECONDS)
     except requests.ConnectionError:
-        return None, f"Backend not running at {BACKEND_URL}", {}
+        return None, f"Backend not running at {BACKEND_URL}"
     except requests.Timeout:
-        return None, f"The backend took longer than {TIMEOUT_SECONDS} seconds to answer", {}
+        return None, f"The backend took longer than {TIMEOUT_SECONDS} seconds to answer"
     try:
-        return reply.status_code, reply.json(), cache_ages(reply)
+        return reply.status_code, reply.json()
     except ValueError:
-        return None, f"The backend sent an unexpected reply (HTTP {reply.status_code})", {}
-
-
-# Read the backend's X-Cache-Age-<source> headers: {source: seconds since it was fetched}.
-# A source with no header was just fetched. A reply with no headers at all has no cached sources.
-def cache_ages(reply):
-    headers = getattr(reply, "headers", None) or {}
-    ages = {}
-    for key in SOURCE_NAMES:
-        value = headers.get(f"X-Cache-Age-{key}")
-        if value is not None and value.isdigit():
-            ages[key] = int(value)
-    return ages
-
-
-# Turn a number of seconds into a short phrase such as "42 s", "7 min" or "2 h".
-def describe_age(seconds):
-    if seconds < 60:
-        return f"{seconds} s"
-    if seconds < 3600:
-        return f"{seconds // 60} min"
-    return f"{seconds // 3600} h"
+        return None, f"The backend sent an unexpected reply (HTTP {reply.status_code})"
 
 
 # Show the VirusTotal details on the page.
@@ -86,11 +67,8 @@ SHOW_FUNCTIONS = {
 
 
 # Show one source's section: its status, then its details or its error.
-# `age` is set only when the result came from the backend's cache: a kept result can be out of date.
-def show_source(key, result, age=None):
+def show_source(key, result):
     st.subheader(SOURCE_NAMES[key])
-    if age is not None:
-        st.caption(f"Cached result, fetched {describe_age(age)} ago. It may have changed since.")
     if result["status"] == "ok":
         SHOW_FUNCTIONS[key](result["data"])
     elif result["status"] == "not_found":
@@ -104,7 +82,7 @@ st.title("Hash lookup")
 file_hash = st.text_input("MD5, SHA-1 or SHA-256 hash").strip()
 
 if st.button("Look up") and file_hash:
-    status_code, body, ages = ask_backend(file_hash)
+    status_code, body = ask_backend(file_hash)
     if status_code is None:
         st.error(body)  # body is the message from ask_backend
     elif status_code != 200:
@@ -113,4 +91,5 @@ if st.button("Look up") and file_hash:
     else:
         st.caption(f"{body['hash_type']}: {body['hash']}")
         for key, result in body["sources"].items():
-            show_source(key, result, ages.get(key))
+            show_source(key, result)
+        st.caption(CACHE_NOTE)

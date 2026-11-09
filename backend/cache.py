@@ -22,24 +22,25 @@ MAX_ENTRIES = 5000  # a safety limit, so the dictionary cannot grow without end
 # The clock is a variable so that tests can replace it and "move time" without waiting.
 clock = time.monotonic
 
-# (source, hash) -> (stored_at, expires_at, result)
+# (source, hash) -> (expires_at, result)
 _entries = {}
 # Several requests can arrive at once, so changes to the dictionary take turns.
 _lock = threading.Lock()
 
 
-# Return (result, age in seconds) if a fresh copy is stored, otherwise None.
+# Return the stored result if a fresh copy exists, otherwise None.
+# It returns the stored dict itself (not a copy), so nothing should change it.
 def get(source, file_hash):
     now = clock()
     with _lock:
         entry = _entries.get((source, file_hash))
         if entry is None:
             return None
-        stored_at, expires_at, result = entry
+        expires_at, result = entry
         if now >= expires_at:
             del _entries[(source, file_hash)]
             return None
-    return result, int(now - stored_at)
+    return result
 
 
 # Keep a result for as long as its source and its status allow. An error is never kept.
@@ -52,12 +53,12 @@ def put(source, file_hash, result):
     with _lock:
         if len(_entries) >= MAX_ENTRIES:
             make_room(now)
-        _entries[(source, file_hash)] = (now, now + seconds, result)
+        _entries[(source, file_hash)] = (now + seconds, result)
 
 
 # Called while holding the lock. Drop the expired entries; if it is still full, drop the oldest one.
 def make_room(now):
-    for key in [key for key, entry in _entries.items() if now >= entry[1]]:
+    for key in [key for key, entry in _entries.items() if now >= entry[0]]:
         del _entries[key]
     if len(_entries) >= MAX_ENTRIES:
         del _entries[next(iter(_entries))]  # a dictionary remembers the order it was filled in
