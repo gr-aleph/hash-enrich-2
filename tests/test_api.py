@@ -54,6 +54,14 @@ def test_all_sources_found(monkeypatch):
         assert body["sources"][source]["status"] == "ok"
 
 
+def test_the_answer_has_a_verdict(monkeypatch):
+    use_saved_replies(monkeypatch, {"virustotal": "hit", "malwarebazaar": "hit", "threatfox": "bad_key"})
+    body = client.get(f"/api/v1/hash/{MIRAI}").json()
+    assert list(body["verdict"]) == ["score", "label", "reasons", "failed_sources"]
+    assert body["verdict"]["label"] == "malicious"
+    assert body["verdict"]["failed_sources"] == ["threatfox"]
+
+
 def test_one_failing_source_does_not_hide_the_others(monkeypatch):
     use_saved_replies(monkeypatch, {"virustotal": "bad_key", "malwarebazaar": "hit", "threatfox": "hit"})
     body = client.get(f"/api/v1/hash/{MIRAI}").json()

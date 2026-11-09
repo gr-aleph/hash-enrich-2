@@ -72,9 +72,26 @@ Test hashes:
 
 | Hash | Expected |
 |---|---|
-| `add97f691f8bd8af5efe0480a90f12bcdcfa089f7432088b4ff8bd0606ff58de` | Mirai sample, found by all three |
-| `44d88612fea8a8f36de82e1278abb02f` | EICAR test file, found on VirusTotal only |
-| `0000000000000000000000000000000000000000000000000000000000000000` | not found anywhere |
+| `add97f691f8bd8af5efe0480a90f12bcdcfa089f7432088b4ff8bd0606ff58de` | Mirai sample, found by all three; verdict malicious |
+| `44d88612fea8a8f36de82e1278abb02f` | EICAR test file, found on VirusTotal only; verdict malicious (from VirusTotal) |
+| `0000000000000000000000000000000000000000000000000000000000000000` | not found anywhere; verdict unknown, score 0 (not "safe") |
+
+## Verdict
+
+Next to `sources`, every answer has a `verdict`, worked out by `backend/verdict.py` from the
+source results:
+
+```json
+"verdict": {"score": 90, "label": "malicious",
+            "reasons": ["MalwareBazaar has this file as a malware sample (Mirai)"],
+            "failed_sources": []}
+```
+
+The score (0-100) is how much evidence of harm was found; the highest source wins. The label is
+`malicious` (75+), `suspicious` (40-74) or `unknown` (below 40). There is no "clean" label: a hash
+nobody knows gets score 0 and `unknown`, never "safe". A source that failed is named in
+`failed_sources` and in the reasons. The page shows the verdict as a coloured box above the
+sources. The rules are in [design.md](design.md), section "Verdict".
 
 ## Run the tests
 
@@ -85,7 +102,7 @@ The tests use saved replies in `tests/fixtures`, so they need no internet and no
 .venv\Scripts\python -m pytest -v
 ```
 
-You should see `68 passed`. If you have not installed the MCP server's packages, the 22 MCP tests are skipped and you see `46 passed, 3 skipped` (3 test files skipped). A warning about `httpx2` is expected and harmless.
+You should see `82 passed`. If you have not installed the MCP server's packages, the 22 MCP tests are skipped and you see `60 passed, 3 skipped` (3 test files skipped). A warning about `httpx2` is expected and harmless.
 
 ## Caching
 
@@ -93,8 +110,8 @@ Each source's answer is kept in memory for a while, so asking about the same has
 call the source again (VirusTotal's free key allows only 4 lookups a minute and 500 a day):
 VirusTotal 30 minutes, MalwareBazaar 6 hours, ThreatFox 1 hour; "not found" 5 to 10 minutes; an
 error is never kept. The reasons for each time are in [design.md](design.md), section "Caching".
-The page shows a fixed note that a result can be that old. The JSON answer is unchanged, with no
-new field and no header. The cache is empty again when the backend restarts.
+The page shows a fixed note that a result can be that old. The cache adds no field and no header to the JSON
+answer. The cache is empty again when the backend restarts.
 
 A fixed list of 24 lookups with a fake web (no keys, no quota) caused 66 outbound requests without the
 cache and 18 with it (VirusTotal 22 to 5, MalwareBazaar 22 to 5, ThreatFox 22 to 8). Details in design.md.
@@ -137,6 +154,7 @@ ask about hashes of internal files. Details: [design.md](design.md), section "MC
 | `backend/malwarebazaar.py` | Same for MalwareBazaar |
 | `backend/threatfox.py` | Same for ThreatFox |
 | `backend/cache.py` | The in-memory cache (what is kept, and for how long) |
+| `backend/verdict.py` | Works out the overall verdict (score, label, reasons) from the source results |
 | `frontend/app.py` | The Streamlit page |
 | `mcp_server/` | The MCP server (one tool) and its requirements |
 | `tests/` | pytest tests and saved replies |

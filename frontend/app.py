@@ -66,6 +66,18 @@ SHOW_FUNCTIONS = {
 }
 
 
+# Which coloured box shows which verdict label: red, yellow or blue
+VERDICT_BOXES = {"malicious": st.error, "suspicious": st.warning, "unknown": st.info}
+
+
+# Show the overall verdict in a coloured box: the label, the score, and the reasons as bullets.
+def show_verdict(verdict):
+    text = f"**{verdict['label'].upper()}** - score {verdict['score']}/100\n"
+    for reason in verdict["reasons"]:
+        text += f"\n- {reason}"
+    VERDICT_BOXES[verdict["label"]](text)
+
+
 # Show one source's section: its status, then its details or its error.
 def show_source(key, result):
     st.subheader(SOURCE_NAMES[key])
@@ -90,6 +102,8 @@ if st.button("Look up") and file_hash:
         st.error(body.get("error") or f"The backend answered HTTP {status_code}")
     else:
         st.caption(f"{body['hash_type']}: {body['hash']}")
+        if "verdict" in body:  # an older backend sends no verdict; then we just skip the box
+            show_verdict(body["verdict"])
         for key, result in body["sources"].items():
             show_source(key, result)
         st.caption(CACHE_NOTE)
