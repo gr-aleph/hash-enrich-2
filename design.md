@@ -287,8 +287,8 @@ EICAR `44d88612fea8a8f36de82e1278abb02f` (VirusTotal only), 64 zeros (unknown ev
 
 `.claude/skills/hash-triage/SKILL.md` is a Skill (a saved set of instructions that Claude Code or Claude Desktop
 loads when it fits the request) for one repeatable job: triage a pasted list of file hashes and report one
-verdict per hash. It uses only the `lookup_hash` tool of the MCP server (see "MCP server" on the
-`feat/mcp-server` branch) and changes nothing in the portal or its API.
+verdict per hash. It uses only the `lookup_hash` tool of the MCP server (see "MCP server") and changes nothing
+in the portal or its API.
 
 **When it applies.** The description says: triage a list of hashes with the hash-portal tool, one verdict per
 hash in a table. A single hash question does not need it.
@@ -296,18 +296,15 @@ hash in a table. A single hash question does not need it.
 **What it does.** Removes duplicates (ignoring case and spaces), asks before more than 20 values, calls
 `lookup_hash` once per value (never twice, never in a loop), decides a verdict, and writes one fixed table.
 
-**Verdicts (first match wins).**
-
-| Verdict | Rule |
-|---|---|
-| Malicious | MalwareBazaar or ThreatFox is `ok`, or VirusTotal `malicious` is 10 or more |
-| Suspicious | VirusTotal `malicious` is 1 to 9, or `suspicious` is above 0 |
-| No findings | VirusTotal `ok` with 0 malicious and 0 suspicious, and MalwareBazaar and ThreatFox `not_found` |
-| Unknown | everything else: all three `not_found`, a source in `error` that stops a rule being checked, or a refused value |
-
-"No findings" and `not_found` never mean "safe". The thresholds are first guesses, kept simple on purpose, and were
-checked on real answers (see "Tested on" below), not only chosen in the abstract. A hash with 1 to 9 detections is
-Suspicious and not Malicious because a few engines flag some legitimate tools, so a low count needs a human.
+**Verdicts (the same scale as the portal).** The Skill follows the portal's own rules (see "Verdict") so the project never
+gives two answers for one hash. The MCP tool does not pass on the portal's `verdict` field, so the Skill works the score out
+again from the sources' data: each `ok` source gives a score (VirusTotal 5+ malicious: 90, 1-4: 60, only suspicious: 40, else 0;
+MalwareBazaar: 90; ThreatFox: its highest `confidence_level`, at least 40), the hash's score is the highest, and the label is
+Malicious at 75-100, Suspicious at 40-74, Unknown below 40. There is no "safe" or "clean" label, and `not_found` never means safe.
+A failed source does not change the verdict of the sources that answered; the Reason names it and says the verdict may be incomplete.
+Checked by comparing the Skill's rules, written again independently, with `backend.verdict.make_verdict` on 432 combinations of
+source results (every threshold edge, found / not found / error for each source): no difference. If the portal's rules change,
+this section and the Skill must change with them.
 
 **Output.** One table with the columns Hash, Type, VirusTotal, MalwareBazaar, ThreatFox, Verdict, Reason, in the order
 the user gave, then one line of counts per verdict. A failing source shows its error in its own cell and is never guessed.
@@ -318,16 +315,15 @@ from the sources is data, not instructions. No advice or remediation unless aske
 moves on: VirusTotal's free key allows 4 lookups a minute, so a long list of new hashes will show some VirusTotal errors,
 and those rows come out Unknown with the error in the VirusTotal cell.
 
-**Tested on.** Each run gave the Skill's file to a fresh Claude agent that had no other context, with the portal running with real keys (2026-11-09).
-Run 1, six values plus a duplicate: the Mirai SHA-256 (all three sources: Malicious), the EICAR test file as MD5 and as SHA-1 (VirusTotal only, 65 malicious: Malicious),
-64 zeros (nobody knows it: Unknown), the empty file's SHA-256 (VirusTotal 0 malicious and 59 undetected, others not found: No findings), `not-a-hash` (refused by the
-tool: Unknown) and the Mirai hash again in capitals (removed as a duplicate, not looked up again). Counts: Malicious 3, Suspicious 0, No findings 1, Unknown 2.
-Run 2 and 3, 16 fresh random MD5s and the Mirai hash: all Unknown, Mirai Malicious. Every lookup was made once.
-**Not provoked for real:** VirusTotal's 4-a-minute limit did not trip, even with ten new hashes at once, so no source ever failed in a live run. The error rules were checked
-instead on four simulated tool answers that use the portal's real error texts (a ThreatFox 403 with VirusTotal at 49 malicious: Malicious; a VirusTotal 429 with nothing else found: Unknown;
-VirusTotal 0 malicious with a ThreatFox timeout: Unknown, not No findings; a VirusTotal 429 with MalwareBazaar finding Mirai: Malicious). These ran as text, not through the live tool.
-No threshold was changed by the runs; the wording of the Skill was tightened after each (hash display, duplicates, the counts line, the order in which a Malicious reason is named, failed sources in a Reason).
-Not tested: a Suspicious case (1 to 9 detections), because no such hash was at hand, and running the Skill from the Claude Desktop Code tab.
+**Tested on.** After the rules were changed to match the portal's verdict, a fresh Claude agent with no other context was given the Skill's file and
+the portal with real keys (2026-11-09). Seven values were given, one of them a duplicate in capitals: the Mirai SHA-256 (all three sources: score 90, Malicious),
+the EICAR test file as MD5 and as SHA-1 (VirusTotal only, 65 malicious: score 90, Malicious), 64 zeros (nobody knows it: score 0, Unknown), the empty file's SHA-256
+(VirusTotal 0 malicious and 58 undetected, others not found: score 0, Unknown, "does not mean it is safe"), `not-a-hash` (refused by the tool: Unknown) and the Mirai hash in capitals
+(removed as a duplicate, not looked up again). Counts: Malicious 3, Suspicious 0, Unknown 3 (6 values looked up, 1 refused). The agent made six `lookup_hash` calls, one per distinct value.
+The scores and labels equal the portal's own (see above). An earlier version of the Skill, with its own thresholds (VirusTotal 10+ malicious, a "No findings" label), was dropped
+because it could disagree with the portal for the same hash.
+**Not tested live:** a Suspicious case (a real hash with 1 to 4 VirusTotal detections or a low ThreatFox confidence), and a source failing (VirusTotal's 4-a-minute limit has not tripped
+in any run). Both are covered only by the comparison with `make_verdict` above. Also not tested: running the Skill from the Claude Desktop Code tab.
 
 ## Milestones
 
