@@ -6,11 +6,13 @@
 
 import logging
 import os
+from typing import Annotated
 
 import requests
 from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
+from pydantic import Field  # the MCP SDK already needs pydantic; used only to describe the argument
 
 PORTAL_URL = os.environ.get("PORTAL_URL", "http://127.0.0.1:8000").rstrip("/")
 TIMEOUT_SECONDS = 20  # longer than the portal's own 12 second limit for all its sources
@@ -72,7 +74,9 @@ def shorten(value):
 
 
 @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
-def lookup_hash(file_hash: str) -> dict:
+def lookup_hash(
+    file_hash: Annotated[str, Field(description="The MD5, SHA-1 or SHA-256 hash to look up, as 32, 40 or 64 hex characters. Required.")],
+) -> dict:
     """Look up one file hash (MD5, SHA-1 or SHA-256) in our hash portal. Pass only the hash.
     Returns, for VirusTotal, MalwareBazaar and ThreatFox, a status (ok, not_found or error) and key facts.
     not_found means that source has not seen the hash, not that the file is safe.

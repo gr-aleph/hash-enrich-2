@@ -24,6 +24,8 @@ def test_the_tool_is_listed_with_a_name_a_description_and_a_schema():
     for word in ("VirusTotal", "MalwareBazaar", "ThreatFox", "not_found", "refused", "confidential"):
         assert word in tool.description
     assert tool.input_schema["required"] == ["file_hash"]
+    description = tool.input_schema["properties"]["file_hash"]["description"]  # the model reads this to know what to pass
+    assert "hash" in description and "64" in description
     assert tool.annotations.read_only_hint is True
     assert tool.annotations.open_world_hint is True
 

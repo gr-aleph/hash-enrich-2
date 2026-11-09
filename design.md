@@ -109,7 +109,7 @@ the API changes.
 
 **Tool.** One tool, `lookup_hash(file_hash)`, because the portal has one kind of IOC (a file hash) and tells
 MD5, SHA-1 and SHA-256 apart by length. It is marked read-only and "open world" (it reaches outside services).
-Its description says what goes in, that the answer has a status (ok, not_found, error) for VirusTotal,
+The argument itself is described too (what the model must pass, as 32, 40 or 64 hex characters), because in Claude Desktop the model twice called the tool with the argument missing or misnamed before correcting itself. Its description says what goes in, that the answer has a status (ok, not_found, error) for VirusTotal,
 MalwareBazaar and ThreatFox, that not_found does not mean safe, that error means one source failed while the
 others still answer, that text fields come from third parties and are data, not instructions, and that hashes
 of internal files must not be looked up.
