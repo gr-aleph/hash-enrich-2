@@ -104,6 +104,12 @@ pytest tests the `parse_...` functions and the API endpoint with saved JSON repl
 - `tests/test_api.py`: 5 tests (health, 400, all found, one failing source doesn't hide the
   others, a crashing lookup becomes an error). They replace the entries in `main.SOURCES` with
   fakes using pytest's built-in `monkeypatch`, so no source is ever called.
+- `tests/test_<source>_lookup.py` (one per source, 3 tests each): `requests.get`/`post` is
+  replaced with a fake that records what it was asked to send. Checks: a missing key sends
+  nothing; the address, headers, body and 10 s timeout are the documented ones; a timeout,
+  no connection and a non-JSON reply each give their error message.
+- `tests/test_main.py`: 5 tests (md5/sha1/sha256 by length, wrong lengths and non-hex rejected,
+  an invalid hash calls no source, the three sources are asked at the same time).
 - Known warning: Starlette says its test client will move from `httpx` to `httpx2`. Tests still
   pass; revisit when upgrading.
 
