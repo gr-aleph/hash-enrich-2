@@ -2,6 +2,8 @@
 # The real lookups are swapped for fakes (with monkeypatch) that count how often they are asked,
 # so nothing goes over the internet and no API key is needed.
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -140,7 +142,7 @@ def test_the_cache_never_holds_more_than_max_entries(monkeypatch):
 
 # The fixed note on the page must say the same times as the cache really uses.
 def test_the_page_note_matches_the_expiry_times():
-    note = open("frontend/app.py").read().split("CACHE_NOTE = ")[1].split("\n")[0]
+    note = (Path(__file__).parent.parent / "frontend" / "app.py").read_text().split("CACHE_NOTE = ")[1].split("\n")[0]
     for found_seconds, label in [(cache.EXPIRY["virustotal"][0], "30 min"),
                                  (cache.EXPIRY["malwarebazaar"][0], "6 h"),
                                  (cache.EXPIRY["threatfox"][0], "1 h")]:
