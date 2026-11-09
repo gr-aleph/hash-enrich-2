@@ -85,7 +85,7 @@ The tests use saved replies in `tests/fixtures`, so they need no internet and no
 .venv\Scripts\python -m pytest -v
 ```
 
-You should see `14 passed`. A warning about `httpx2` is expected and harmless.
+You should see `28 passed`. A warning about `httpx2` is expected and harmless.
 
 ## Project files
 
