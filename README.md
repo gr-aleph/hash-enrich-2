@@ -85,7 +85,19 @@ The tests use saved replies in `tests/fixtures`, so they need no internet and no
 .venv\Scripts\python -m pytest -v
 ```
 
-You should see `34 passed`. A warning about `httpx2` is expected and harmless.
+You should see `46 passed`. A warning about `httpx2` is expected and harmless.
+
+## Caching
+
+Each source's answer is kept in memory for a while, so asking about the same hash again does not
+call the source again (VirusTotal's free key allows only 4 lookups a minute and 500 a day):
+VirusTotal 30 minutes, MalwareBazaar 6 hours, ThreatFox 1 hour; "not found" 5 to 10 minutes; an
+error is never kept. The reasons for each time are in [design.md](design.md), section "Caching".
+The page shows a fixed note that a result can be that old. The JSON answer is unchanged, with no
+new field and no header. The cache is empty again when the backend restarts.
+
+A fixed list of 24 lookups with a fake web (no keys, no quota) caused 66 outbound requests without the
+cache and 18 with it (VirusTotal 22 to 5, MalwareBazaar 22 to 5, ThreatFox 22 to 8). Details in design.md.
 
 ## Project files
 
@@ -95,6 +107,7 @@ You should see `34 passed`. A warning about `httpx2` is expected and harmless.
 | `backend/virustotal.py` | Calls VirusTotal and turns its reply into a result |
 | `backend/malwarebazaar.py` | Same for MalwareBazaar |
 | `backend/threatfox.py` | Same for ThreatFox |
+| `backend/cache.py` | The in-memory cache (what is kept, and for how long) |
 | `frontend/app.py` | The Streamlit page |
 | `tests/` | pytest tests and saved replies |
 | `.streamlit/config.toml` | Keeps the page local (127.0.0.1) |
