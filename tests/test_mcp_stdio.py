@@ -13,6 +13,11 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
+import pytest
+
+# Skip these tests (instead of crashing the whole run) when the MCP package is not installed.
+pytest.importorskip("mcp")
+
 from mcp import Client, StdioServerParameters
 
 from mcp_helpers import MIRAI, answer_of, recorded
@@ -76,11 +81,11 @@ def test_every_line_the_real_server_writes_to_stdout_is_an_mcp_message():
     try:
         send(process, {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
             "protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "test", "version": "1"}}})
-        process.stdout.readline()  # the answer to initialize
+        first = process.stdout.readline()  # the answer to initialize
         send(process, {"jsonrpc": "2.0", "method": "notifications/initialized"})
         send(process, {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
                        "params": {"name": "lookup_hash", "arguments": {"file_hash": MIRAI}}})
-        process.stdout.readline()  # the answer to the tool call
+        second = process.stdout.readline()  # the answer to the tool call
         process.stdin.close()  # end of input: the server exits and flushes everything it has written
         rest = process.stdout.read()
         process.wait(timeout=10)
@@ -88,5 +93,7 @@ def test_every_line_the_real_server_writes_to_stdout_is_an_mcp_message():
         watchdog.cancel()
         process.kill()
         stub.shutdown()
-    for line in rest.splitlines():
+    # The two lines read above are checked too: a stray print would show up there, not in `rest`.
+    assert first.strip() and second.strip(), "the server gave no answer"
+    for line in [first, second] + rest.splitlines():
         assert line.strip() == "" or json.loads(line)["jsonrpc"] == "2.0", f"not an MCP message: {line!r}"

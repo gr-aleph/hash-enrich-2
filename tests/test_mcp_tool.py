@@ -6,8 +6,12 @@ import json
 
 import pytest
 import requests
-from mcp import Client
 from types import SimpleNamespace
+
+# Skip these tests (instead of crashing the whole run) when the MCP package is not installed.
+pytest.importorskip("mcp")
+
+from mcp import Client
 
 from mcp_helpers import MIRAI, PORTAL_ADDRESS, answer_of, call_tool, error_text, portal_gives, recorded
 from mcp_server import server

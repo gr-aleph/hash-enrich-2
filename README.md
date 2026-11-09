@@ -85,7 +85,7 @@ The tests use saved replies in `tests/fixtures`, so they need no internet and no
 .venv\Scripts\python -m pytest -v
 ```
 
-You should see `56 passed` (`34 passed` if you have not installed the MCP server's packages: the MCP tests then fail to import). A warning about `httpx2` is expected and harmless.
+You should see `56 passed`. If you have not installed the MCP server's packages, the 22 MCP tests are skipped and you see `34 passed, 3 skipped` (3 test files skipped). A warning about `httpx2` is expected and harmless.
 
 ## MCP server (use the portal from Claude Desktop)
 
