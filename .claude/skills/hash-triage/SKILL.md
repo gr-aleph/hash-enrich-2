@@ -17,33 +17,16 @@ available, say so and stop: do not use another tool, the web or your memory to l
 3. **Call `lookup_hash` once per value** (the calls may be made in any order, or together). Do not check the value yourself: the tool refuses anything that is not a
    32, 40 or 64 character hex hash, and its message goes in the table. Never call it twice for the same value, and
    never retry in a loop. Hashes of internal or confidential files must not be looked up: if the user says a file is internal, skip it.
-4. **Decide the verdict** from the tool's answer with the rules below.
+4. **Take the verdict** from the tool's answer (see below).
 5. **Write the report** in the exact format below, and nothing else that is not asked for.
 
-## Verdict rules (the same as the portal's own verdict)
+If the tool says the portal is not running, or must be restarted, stop and tell the user: do not go on with the list.
 
-The portal gives each hash a score from 0 to 100 and a label. **0 means safe and 100 means malicious.** Work it out the same way,
-from the tool's answer. Score each source whose status is `ok`:
+## The verdict comes from the portal
 
-| Source (`ok`) | Score |
-|---|---|
-| VirusTotal | `malicious` 5 or more: 90. `malicious` 1 to 4: 65. `malicious` 0 and `suspicious` 1 or more: 60. Otherwise count the engines that found nothing (`harmless` + `undetected`): fewer than 30: 50; 30 or more: 0 |
-| MalwareBazaar | 90 (it only stores malware samples) |
-| ThreatFox | the highest `confidence_level` of its matches, but at least 60 (a missing `confidence_level` is ignored) |
-
-The hash's score is the **highest** of those. If no source is `ok` (nobody knows the hash), the score is 50.
-If the score is below 30 but any source has status `error`, the score becomes 50: a hash is never called safe while a source failed.
-
-Its verdict: **Malicious** at 70 or more, **Suspicious** at 30 to 69, **Safe** below 30.
-
-A hash nobody knows is Suspicious (50), not Safe: not being known is not proof of safety. Safe needs VirusTotal to say that 30 or more engines
-checked the file and none flagged it, and no source may have failed (`not_found` from MalwareBazaar and ThreatFox is fine). Even then the Reason says
-"none of N engines flags it", never "this file is safe", because brand-new malware can have no detections yet.
-A source with status `error` gives no score and is never guessed. It does not change the verdict of the sources that answered (a
-MalwareBazaar hit stays Malicious when ThreatFox failed), but the Reason must say which source failed and that the verdict may be incomplete.
-
-Example: VirusTotal 0 malicious, 0 suspicious and 58 undetected, MalwareBazaar and ThreatFox `not_found`: score 0, Safe. The same with ThreatFox `error`: score 50,
-Suspicious. VirusTotal 49 malicious and ThreatFox `error`: score 90, Malicious, with "(ThreatFox failed, so this may be incomplete)".
+The tool's answer has a `verdict` with a `score` (0 = safe, 100 = malicious), a `label` (safe, suspicious or malicious),
+`reasons` and `failed_sources`. Use them as they are. **Never work the score out yourself and never change it**: the portal's
+rules (in `backend/verdict.py`) are the only rules.
 
 ## Report format
 
@@ -55,12 +38,9 @@ One table, one row per value in the user's order, with exactly these columns:
 - **Hash:** the value as given, lowercase. Only a value longer than 40 characters (a SHA-256) is shortened, to its first 16 characters and `...`. A refused value is shown as the user typed it (cut to 20 characters).
 - **Type:** md5, sha1 or sha256, from the tool's answer; `-` if refused.
 - **VirusTotal / MalwareBazaar / ThreatFox:** a short cell. VirusTotal: `<malicious> malicious, <suspicious> suspicious, <undetected> undetected`, or `not found`. MalwareBazaar: the signature, or `not found`. ThreatFox: `<malware name> <confidence>%` of the first match (add ` (+N more)` if there are more matches), or `not found`. MalwareBazaar with no signature: `found, no signature`. A failing source: `error: ` and its message, word for word. Ignore fields not listed here (file type, names, links).
-- **Verdict:** Malicious, Suspicious or Safe.
-- **Reason:** one short sentence that starts with the score, for example `Score 90: MalwareBazaar lists it as Mirai.` Name the source that gave the highest
-  score (on a tie, MalwareBazaar, then ThreatFox, then VirusTotal). For a score of 0 write `Score 0: none of N engines flags it.` (N = harmless + undetected).
-  For VirusTotal with fewer than 30 engines write `Score 50: no engine flags it, but only N engines checked it.` When no source knows the hash write
-  `Score 50: No source knows this hash. Not being known is not proof it is safe.` If any source failed, add `(<name> failed, so this may be incomplete)` for each one;
-  if that is why a score below 30 became 50, say so: `Not called safe because <name> failed.`
+- **Verdict:** the tool's `verdict.label` with a capital letter: Malicious, Suspicious or Safe.
+- **Reason:** `Score <verdict.score>: ` followed by the tool's `verdict.reasons`, joined with `; `. Do not add your own reasons.
+  The reasons already say when a source failed; never write "this file is safe".
 - **A refused value:** Type `-`, source cells `refused`, Verdict `Not checked`, Reason: the tool's reason. A refused value is not counted under Malicious, Suspicious or Safe; it appears only as "refused" in the counts line.
 
 After the table, one line of counts, for example: `Malicious 2, Suspicious 2, Safe 1 (5 values looked up, 1 refused).` "Values looked up" counts the distinct values, after duplicates were removed.
