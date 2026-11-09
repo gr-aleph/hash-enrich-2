@@ -128,7 +128,7 @@ list to 10 items, because whatever a source wrote reaches the model.
 
 **Logs.** To stderr only, never the hash itself. stdout carries the protocol, so the server never prints.
 
-**Tests** (`tests/test_mcp_*.py`, offline): recorded real portal answers (`tests/fixtures/portal/`); the tool
+**Tests** (`tests/test_mcp_*.py`, offline): recorded real portal answers (`tests/fixtures/portal/`, made by running the real backend with the saved source replies of `tests/fixtures/`, and the source error and the 400 as the backend gives them); the tool
 list and annotations; found, nothing known, one source failing, invalid values (no request is made), portal
 down, slow, 400, not JSON; and one test that starts the real server and checks that every line on stdout is a
 protocol message. The server needs its own packages: `pip install -r mcp_server/requirements.txt`.
