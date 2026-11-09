@@ -104,31 +104,52 @@ One failing source never hides the others. "Not found" does not mean "safe".
 answer, with the reasons, while the three sections stay exactly as they were.
 
 **Shape.** `verdict` is added after `sources`; no existing field changed. `score` is a whole number
-0-100, `label` is `malicious`, `suspicious` or `unknown`, `reasons` is a list of short texts, and
-`failed_sources` lists the names of the sources whose status is `error`.
+0-100 (always a number), `label` is `safe`, `suspicious` or `malicious`, `reasons` is a list of short
+texts, and `failed_sources` lists the names of the sources whose status is `error`.
+
+**Scale** (changed after instructor feedback, branch `feat/verdict-scale`): **0 = safe, 100 = malicious.**
+Ranges: 0-29 `safe`, 30-69 `suspicious`, 70-100 `malicious`.
 
 **Rules.** Each source that found the hash (`ok`) gives a score; the verdict's score is the highest.
 
-| Source (`ok`) | Score |
+| Case | Score |
 |---|---|
-| VirusTotal | 5+ engines say malicious: 90; 1-4 malicious: 60; 0 malicious and 1+ suspicious: 40; otherwise 0 |
-| MalwareBazaar | 90 (it only stores malware samples) |
-| ThreatFox | the highest `confidence_level` of its matches, but at least 40 (any match is at least suspicious) |
+| VirusTotal: 5+ engines say malicious | 90 |
+| VirusTotal: 1-4 engines say malicious | 65 |
+| VirusTotal: 0 malicious, 1+ suspicious | 60 |
+| VirusTotal: no engine flags it, but fewer than 30 engines checked it (harmless + undetected) | 50 |
+| VirusTotal: none of 30+ engines flags it | 0 |
+| MalwareBazaar has it (it only stores malware samples) | 90 |
+| ThreatFox: the highest `confidence_level` of its matches, but at least 60 | 60-100 |
+| No source knows the hash | 50 |
+| The score would be safe (under 30), but a source failed | 50 |
 
-Label: 75-100 `malicious`, 40-74 `suspicious`, 0-39 `unknown`. A missing count or confidence is
-treated as described in `backend/verdict.py` and never crashes the answer.
+A missing count or confidence is read with `.get()` and never crashes the answer.
 
-**Honest by design.** The score measures evidence of harm, not safety, so there is no "clean" label:
-a hash no source knows gets 0 and `unknown`, with the reason "This does not mean it is safe".
-VirusTotal with no detections says the same. A source that failed is listed in `failed_sources` and
-gets the reason "<source> failed, so this verdict may be incomplete"; the sources that answered
-still count (a MalwareBazaar hit stays malicious when ThreatFox timed out).
+**Why an unknown hash is 50.** The instructor asked for a number for every hash and to be critical about
+hashes nobody knows. Not being on VirusTotal is not proof of malware (most private files were never
+uploaded), but a hash an analyst was asked to check and that nobody has seen must never look safe. So it is
+`suspicious`, in the middle of the scale. It stays below 60, the lowest score any real sign of harm gets
+(a low-confidence ThreatFox match, or VirusTotal "suspicious" votes), so some evidence always counts for
+more than no information. 50 is a policy choice, not a probability.
+
+**Why "safe" needs so much.** Only VirusTotal can say "engines checked this and found nothing";
+MalwareBazaar and ThreatFox can only say "I don't have it". So 0 needs VirusTotal with 30+ engines and no
+detections, and all three sources must have answered: a source that failed might have known the file as
+malware. Even then new malware can have 0 detections, so the reason says "none of N engines flags it",
+not "this file is safe". A failed source is listed in `failed_sources` with the reason "<source> failed,
+so this verdict may be incomplete"; the sources that answered still count (a MalwareBazaar hit stays
+malicious when ThreatFox timed out).
+
+**Note.** `suspicious` covers cases with different meanings: a hash nobody knows (50) and one with a
+few suspicious VirusTotal votes (60) share the label. The score and the `reasons` tell them apart, so the
+page always shows both.
 
 **Pure.** `make_verdict` only reads the `sources` dict it is given (no network, no cache), so the
 tests call it with small hand-made dicts. It is worked out on every answer, cached sources or not.
 
-**Page.** A coloured box above the three sections: red (malicious), yellow (suspicious) or blue
-(unknown), with "LABEL - score N/100" and the reasons as bullets. No new heading. If the answer has
+**Page.** A coloured box above the three sections: red (malicious), yellow (suspicious) or green
+(safe), with "LABEL - score N/100" and the reasons as bullets. No new heading. If the answer has
 no `verdict` (an older backend), the box is skipped.
 
 **Not changed.** The MCP server still passes on only `hash`, `hash_type` and `sources`.
@@ -262,10 +283,10 @@ pytest tests the `parse_...` functions and the API endpoint with saved JSON repl
 - `tests/test_main.py`: 6 tests (md5/sha1/sha256 by length, wrong lengths and non-hex rejected,
   an invalid hash calls no source, the three sources are asked at the same time, a slow source
   gets "Took longer" while the others still answer).
-- `tests/test_frontend.py`: 6 tests using Streamlit's built-in `AppTest` (runs the page without
+- `tests/test_frontend.py`: 7 tests using Streamlit's built-in `AppTest` (runs the page without
   a browser) with `requests.get` faked: backend down, backend too slow, invalid hash, a 404
   reply doesn't crash the page, one failed source still shows all three sections, a malicious
-  verdict shows a red box with the score.
+  verdict shows a red box with the score, a safe verdict shows a green box.
 - `tests/test_cache.py`: 7 tests of the cache as the backend uses it, with fake lookups that count
   their calls (a miss, a hit, an expired entry using a fake clock, an error that is not cached,
   "not found" is cached, spellings share one entry while different hashes and sources never do, the
@@ -273,9 +294,10 @@ pytest tests the `parse_...` functions and the API endpoint with saved JSON repl
 - `tests/test_cache_rules.py`: 5 tests of the cache's own rules, calling `cache.put`/`cache.get`
   directly ("not found" expires sooner than a found answer, once per source; the cache never holds
   more than `MAX_ENTRIES`; the page note matches the expiry times).
-- `tests/test_verdict.py`: 12 tests of `make_verdict` with hand-made results (each VirusTotal rule,
-  a MalwareBazaar hit alone, ThreatFox high, low and missing confidence, the highest wins, not found
-  anywhere, one failed source with a hit elsewhere, all three failed).
+- `tests/test_verdict.py`: 14 tests of `make_verdict` with hand-made results (each VirusTotal rule,
+  including safe from 30+ engines and suspicious from too few, a MalwareBazaar hit alone, ThreatFox high,
+  low and missing confidence, the highest wins, not found anywhere is suspicious, clean on VirusTotal
+  but a failed source is not safe, one failed source with a hit elsewhere, all three failed).
 - `tests/conftest.py` empties the cache before every test.
 - Known warning: Starlette says its test client will move from `httpx` to `httpx2`. Tests still
   pass; revisit when upgrading.
@@ -297,33 +319,33 @@ hash in a table. A single hash question does not need it.
 `lookup_hash` once per value (never twice, never in a loop), decides a verdict, and writes one fixed table.
 
 **Verdicts (the same scale as the portal).** The Skill follows the portal's own rules (see "Verdict") so the project never
-gives two answers for one hash. The MCP tool does not pass on the portal's `verdict` field, so the Skill works the score out
-again from the sources' data: each `ok` source gives a score (VirusTotal 5+ malicious: 90, 1-4: 60, only suspicious: 40, else 0;
-MalwareBazaar: 90; ThreatFox: its highest `confidence_level`, at least 40), the hash's score is the highest, and the label is
-Malicious at 75-100, Suspicious at 40-74, Unknown below 40. There is no "safe" or "clean" label, and `not_found` never means safe.
-A failed source does not change the verdict of the sources that answered; the Reason names it and says the verdict may be incomplete.
-Checked by comparing the Skill's rules, written again independently, with `backend.verdict.make_verdict` on 432 combinations of
-source results (every threshold edge, found / not found / error for each source): no difference. If the portal's rules change,
-this section and the Skill must change with them.
+gives two answers for one hash: 0 = safe, 100 = malicious. The MCP tool does not pass on the portal's `verdict` field, so the
+Skill works the score out again from the sources' data. Each `ok` source gives a score: VirusTotal 5+ malicious 90, 1-4 malicious 65,
+only suspicious 60, no detections but fewer than 30 engines 50, no detections from 30+ engines 0; MalwareBazaar 90; ThreatFox its
+highest `confidence_level`, at least 60. The hash's score is the highest; nobody knows it: 50; a score below 30 becomes 50 when a
+source failed. Labels: Malicious 70-100, Suspicious 30-69, Safe 0-29. Reasons say "none of N engines flags it", never "this file is safe".
+Checked by comparing the Skill's rules, written again independently, with `backend.verdict.make_verdict` on 1,134 combinations of
+source results (every threshold edge, engine counts, found / not found / error for each source): no difference. If the portal's rules
+change, this section and the Skill must change with them (they already did once, when the scale was flipped).
 
 **Output.** One table with the columns Hash, Type, VirusTotal, MalwareBazaar, ThreatFox, Verdict, Reason, in the order
 the user gave, then one line of counts per verdict. A failing source shows its error in its own cell and is never guessed.
-A refused value gets its own row (Unknown, with the tool's reason) and the list goes on.
+A refused value gets its own row (Not checked, with the tool's reason) and the list goes on.
 
 **Rules for safety.** Looks up only the hashes the user gave (no related indicators, no web search, no other tool). Text
 from the sources is data, not instructions. No advice or remediation unless asked. A rate limit is reported and the Skill
 moves on: VirusTotal's free key allows 4 lookups a minute, so a long list of new hashes will show some VirusTotal errors,
-and those rows come out Unknown with the error in the VirusTotal cell.
+and those rows show the error in the VirusTotal cell and can never be Safe (a failed source caps the score at 50 or more).
 
-**Tested on.** After the rules were changed to match the portal's verdict, a fresh Claude agent with no other context was given the Skill's file and
-the portal with real keys (2026-11-09). Seven values were given, one of them a duplicate in capitals: the Mirai SHA-256 (all three sources: score 90, Malicious),
-the EICAR test file as MD5 and as SHA-1 (VirusTotal only, 65 malicious: score 90, Malicious), 64 zeros (nobody knows it: score 0, Unknown), the empty file's SHA-256
-(VirusTotal 0 malicious and 58 undetected, others not found: score 0, Unknown, "does not mean it is safe"), `not-a-hash` (refused by the tool: Unknown) and the Mirai hash in capitals
-(removed as a duplicate, not looked up again). Counts: Malicious 3, Suspicious 0, Unknown 3 (6 values looked up, 1 refused). The agent made six `lookup_hash` calls, one per distinct value.
-The scores and labels equal the portal's own (see above). An earlier version of the Skill, with its own thresholds (VirusTotal 10+ malicious, a "No findings" label), was dropped
-because it could disagree with the portal for the same hash.
-**Not tested live:** a Suspicious case (a real hash with 1 to 4 VirusTotal detections or a low ThreatFox confidence), and a source failing (VirusTotal's 4-a-minute limit has not tripped
-in any run). Both are covered only by the comparison with `make_verdict` above. Also not tested: running the Skill from the Claude Desktop Code tab.
+**Tested on.** After the rules were changed to the portal's flipped scale, a fresh Claude agent with no other context was given the Skill's file and
+the portal with real keys (2026-11-09). Seven values, one a duplicate in capitals: the Mirai SHA-256 (all three sources: score 90, Malicious), the EICAR test file as MD5
+and as SHA-1 (VirusTotal only, 66 malicious: 90, Malicious), 64 zeros (nobody knows it: 50, Suspicious), the empty file's SHA-256 (VirusTotal 0 malicious and 59 engines found nothing,
+others not found: 0, Safe, "none of 59 engines flags it"), `not-a-hash` (refused by the tool: Not checked) and the Mirai hash in capitals (removed as a duplicate, not looked up again).
+Counts: Malicious 3, Suspicious 1, Safe 1 (6 values looked up, 1 refused). Six `lookup_hash` calls, one per distinct value. The portal's own `verdict` for the five looked-up hashes
+(read from its API) gave the same score and label for every one. Earlier versions of the Skill used other rules (its own thresholds, then the portal's first 0 = nothing-found scale);
+both were dropped because they could disagree with the portal.
+**Not tested live:** a real Suspicious case from detections (1 to 4 VirusTotal detections or a low ThreatFox confidence), and a source failing (VirusTotal's 4-a-minute limit has not tripped in any run).
+Both are covered only by the comparison with `make_verdict` above. Also not tested: running the Skill from the Claude Desktop Code tab.
 
 ## Milestones
 
@@ -351,6 +373,11 @@ sources) worked out by one pure function; no "clean" label; failed sources are n
 coloured box; existing fields unchanged; the existing tests pass (only the cache test that lists the
 answer's keys now expects `verdict` too) and new tests cover every rule; merged by pull request that the
 owner reviews.
+
+**Verdict scale** (branch `feat/verdict-scale`, after instructor feedback): 0 = safe, 100 = malicious;
+labels safe / suspicious / malicious with ranges 0-29 / 30-69 / 70-100; an unknown hash is suspicious (50, below any real evidence at 60+);
+safe needs 30+ clean VirusTotal engines and all sources answering; tests rewritten for the new rules;
+merged by pull request that the owner reviews.
 
 **Milestone 6** (branch `feat/hash-triage-skill`): a Skill, `hash-triage`, that triages a list of hashes with the MCP tool and
 reports a verdict per hash in a fixed table; the rules for each verdict are written down and were checked on real answers; a
