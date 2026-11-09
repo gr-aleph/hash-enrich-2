@@ -74,7 +74,7 @@ Test hashes:
 |---|---|
 | `add97f691f8bd8af5efe0480a90f12bcdcfa089f7432088b4ff8bd0606ff58de` | Mirai sample, found by all three; verdict malicious |
 | `44d88612fea8a8f36de82e1278abb02f` | EICAR test file, found on VirusTotal only; verdict malicious (from VirusTotal) |
-| `0000000000000000000000000000000000000000000000000000000000000000` | not found anywhere; verdict unknown, score 0 (not "safe") |
+| `0000000000000000000000000000000000000000000000000000000000000000` | not found anywhere; verdict suspicious, score 50 (never "safe") |
 
 ## Verdict
 
@@ -87,9 +87,10 @@ source results:
             "failed_sources": []}
 ```
 
-The score (0-100) is how much evidence of harm was found; the highest source wins. The label is
-`malicious` (75+), `suspicious` (40-74) or `unknown` (below 40). There is no "clean" label: a hash
-nobody knows gets score 0 and `unknown`, never "safe". A source that failed is named in
+The score runs from 0 (safe) to 100 (malicious); the highest source wins. The label is `safe`
+(0-29), `suspicious` (30-69) or `malicious` (70-100). "Safe" needs real proof: VirusTotal checked the
+file with 30+ engines and none flags it, and all three sources answered. A hash nobody knows gets 50,
+`suspicious`: not proof of malware, but never safe. A source that failed is named in
 `failed_sources` and in the reasons. The page shows the verdict as a coloured box above the
 sources. The rules are in [design.md](design.md), section "Verdict".
 
@@ -102,7 +103,7 @@ The tests use saved replies in `tests/fixtures`, so they need no internet and no
 .venv\Scripts\python -m pytest -v
 ```
 
-You should see `82 passed`. If you have not installed the MCP server's packages, the 22 MCP tests are skipped and you see `60 passed, 3 skipped` (3 test files skipped). A warning about `httpx2` is expected and harmless.
+You should see `85 passed`. If you have not installed the MCP server's packages, the 22 MCP tests are skipped and you see `63 passed, 3 skipped` (3 test files skipped). A warning about `httpx2` is expected and harmless.
 
 ## Caching
 

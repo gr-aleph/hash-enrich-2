@@ -66,8 +66,8 @@ SHOW_FUNCTIONS = {
 }
 
 
-# Which coloured box shows which verdict label: red, yellow or blue
-VERDICT_BOXES = {"malicious": st.error, "suspicious": st.warning, "unknown": st.info}
+# Which coloured box shows which verdict label: red, yellow or green
+VERDICT_BOXES = {"malicious": st.error, "suspicious": st.warning, "safe": st.success}
 
 
 # Show the overall verdict in a coloured box: the label, the score, and the reasons as bullets.
