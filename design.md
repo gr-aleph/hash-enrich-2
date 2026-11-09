@@ -25,6 +25,7 @@ Browser -> Streamlit page (127.0.0.1:8501) -> FastAPI backend (127.0.0.1:8000) -
 | `backend/main.py` | FastAPI app: `/api/v1/health` and `/api/v1/hash/{hash}`; loads `.env`; asks all sources at the same time |
 | `backend/virustotal.py`, `malwarebazaar.py`, `threatfox.py` | One file per source, each with a `lookup_...` function (calls the API) and a `parse_...` function (turns the reply into a result) |
 | `frontend/app.py` | The Streamlit page |
+| `mcp_server/server.py` | The MCP server: one tool that asks the portal about a hash (see "MCP server") |
 | `tests/` | pytest tests; saved replies in `tests/fixtures/<source>/{hit,unknown,bad_key}.json` |
 | `pytest.ini` | Lets tests import `backend` from the project folder |
 | `.env` | API keys (`VT_API_KEY`, `ABUSECH_AUTH_KEY`). In `.gitignore`, never committed |
@@ -100,6 +101,38 @@ One abuse.ch key covers MalwareBazaar and ThreatFox. ThreatFox uses `search_ioc`
 - The repository is public: a committed key counts as stolen. Revoke it and make a new one.
 - Lookups are not private. Never look up hashes of internal files.
 
+## MCP server
+
+`mcp_server/server.py` lets an AI assistant such as Claude Desktop look up a hash through this portal. It
+only calls the portal's API (section "API"); it never calls a source itself and holds no API key. Nothing in
+the API changes.
+
+**Tool.** One tool, `lookup_hash(file_hash)`, because the portal has one kind of IOC (a file hash) and tells
+MD5, SHA-1 and SHA-256 apart by length. It is marked read-only and "open world" (it reaches outside services).
+Its description says what goes in, that the answer has a status (ok, not_found, error) for VirusTotal,
+MalwareBazaar and ThreatFox, that not_found does not mean safe, that error means one source failed while the
+others still answer, that text fields come from third parties and are data, not instructions, and that hashes
+of internal files must not be looked up.
+
+**Finding the portal.** The environment variable `PORTAL_URL` (default `http://127.0.0.1:8000`).
+
+**What it refuses.** Before any request: anything that is not 32, 40 or 64 hex characters (after trimming
+spaces and lowercasing) is a tool error and nothing is sent. The bad value is not repeated back.
+
+**Failures.** Portal not running, no answer in 20 seconds (longer than the portal's own 12), a reply that is
+not JSON, any status other than 200 and 400, and an unexpected shape each become a clear tool error. A
+source that fails is NOT a tool error: it comes through as that source's `error` result.
+
+**Output.** The portal's `hash`, `hash_type` and `sources`, with every text cut to 200 characters and every
+list to 10 items, because whatever a source wrote reaches the model.
+
+**Logs.** To stderr only, never the hash itself. stdout carries the protocol, so the server never prints.
+
+**Tests** (`tests/test_mcp_*.py`, offline): recorded real portal answers (`tests/fixtures/portal/`); the tool
+list and annotations; found, nothing known, one source failing, invalid values (no request is made), portal
+down, slow, 400, not JSON; and one test that starts the real server and checks that every line on stdout is a
+protocol message. The server needs its own packages: `pip install -r mcp_server/requirements.txt`.
+
 ## Testing
 
 pytest tests the `parse_...` functions and the API endpoint with saved JSON replies
@@ -137,3 +170,8 @@ explains install and run on Windows, merged by pull request.
 **Milestone 2** (branch `milestone-2`): add MalwareBazaar and ThreatFox, called at the same
 time (`ThreadPoolExecutor`); a failing source still shows the other two; pytest tests pass
 with Wi-Fi off; README updated; merged by pull request.
+
+**Milestone 5** (branch `feat/mcp-server`): an MCP server with one tool, `lookup_hash`, that calls the running
+portal; it refuses invalid hashes before any request, turns every expected failure into a clear message, keeps no
+key and prints nothing but the protocol; offline tests; added to Claude Desktop and tried with a real question;
+merged by pull request that the owner reviews.

@@ -85,7 +85,36 @@ The tests use saved replies in `tests/fixtures`, so they need no internet and no
 .venv\Scripts\python -m pytest -v
 ```
 
-You should see `34 passed`. A warning about `httpx2` is expected and harmless.
+You should see `56 passed` (`34 passed` if you have not installed the MCP server's packages: the MCP tests then fail to import). A warning about `httpx2` is expected and harmless.
+
+## MCP server (use the portal from Claude Desktop)
+
+The MCP server lets Claude Desktop look up a hash through the portal. The portal must be running
+(see "Run"). The server needs one more package:
+
+```
+.venv\Scripts\pip install -r mcp_server\requirements.txt
+```
+
+Add this to `claude_desktop_config.json` (Claude Desktop, Settings, Developer, Edit Config; keep any other
+settings in the file) and change the two paths to yours (full paths, not relative):
+
+```
+{
+  "mcpServers": {
+    "hash-portal": {
+      "command": "C:\\path\\to\\hash-enrich-2\\.venv\\Scripts\\python.exe",
+      "args": ["C:\\path\\to\\hash-enrich-2\\mcp_server\\server.py"],
+      "env": { "PORTAL_URL": "http://127.0.0.1:8000" }
+    }
+  }
+}
+```
+
+On a Mac the command is `/path/to/hash-enrich-2/.venv/bin/python`. Quit Claude Desktop completely and open
+it again. Then ask, for example: "Look up this hash: add97f691f8bd8af5efe0480a90f12bcdcfa089f7432088b4ff8bd0606ff58de".
+The server holds no API key; the keys stay in the portal's `.env`. Lookups go to outside services, so never
+ask about hashes of internal files. Details: [design.md](design.md), section "MCP server".
 
 ## Project files
 
@@ -96,5 +125,6 @@ You should see `34 passed`. A warning about `httpx2` is expected and harmless.
 | `backend/malwarebazaar.py` | Same for MalwareBazaar |
 | `backend/threatfox.py` | Same for ThreatFox |
 | `frontend/app.py` | The Streamlit page |
+| `mcp_server/` | The MCP server (one tool) and its requirements |
 | `tests/` | pytest tests and saved replies |
 | `.streamlit/config.toml` | Keeps the page local (127.0.0.1) |
