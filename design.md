@@ -121,7 +121,7 @@ ignored, as before. The three `lookup_...` and `parse_...` functions are not cha
 
 | Source | `ok` kept | `not_found` kept | Reasons: how often the data changes, how fresh an analyst needs it, how tight the limits are |
 |---|---|---|---|
-| VirusTotal | **30 min** | **5 min** | Detection counts change as antivirus engines update, so an old answer can show fewer detections than today; an analyst triaging a hash needs minutes, not days. But its limit is the tightest of the three (4 a minute, 500 a day), so repeats within a session must be absorbed. "Not found" is short because anyone can submit the file at any moment. Terms: "Public vs Premium API" (docs.virustotal.com) sets those limits and says nothing about caching. VirusTotal's Terms of Service (the version its docs link to, "Historic Terms of Service", last updated 2021; the "current" link goes to Google's general cloud terms) have no clause about caching, the Public API or rate limits. They forbid copying, republishing or distributing material from the Service and reserve the right to limit use "including storage". This cache is a private, short-lived copy in this backend's memory, used only to answer the same analyst's repeat lookups; it is never written to disk, published or shared. |
+| VirusTotal | **30 min** | **5 min** | Detection counts change as antivirus engines update, so an old answer can show fewer detections than today; an analyst triaging a hash needs minutes, not days. But its limit is the tightest of the three (4 a minute, 500 a day), so repeats within a session must be absorbed. "Not found" is short because anyone can submit the file at any moment. Terms: "Public vs Premium API" (docs.virustotal.com) sets those limits and says nothing about caching. VirusTotal's 2021 Terms of Service ("Historic Terms of Service") forbid copying, reproducing or distributing material from the Service; the current Terms of Service page showed no text when checked on 2026-11-09. The course instructor approved this cache on 2026-11-09: a private, short-lived copy in this backend's memory, used only for the same analyst's repeat lookups, never written to disk, published or shared. |
 | MalwareBazaar | **6 h** | **10 min** | Facts about a sample (family name, file type, first seen) rarely change, and hours are fresh enough. No numeric query limit is published, only abuse.ch's "fair use principles" (query volumes reasonable for non-commercial use), and fewer repeated queries fits that. "Not found" is short because a new sample can be uploaded at any time. Terms: the abuse.ch Terms of Use and the API page say nothing about caching. |
 | ThreatFox | **1 h** | **5 min** | Indicators are added all the time, their confidence can change, and since 2025-05-01 indicators older than 6 months expire and disappear from the API, so a long expiry could keep one that is gone. No numeric query limit, only "fair use principles". "Not found" is short because new indicators appear constantly. Terms: nothing about caching. |
 | any source, `error` | **never** | | A timeout, a 429, a 5xx and a missing key are not answers. |
@@ -190,12 +190,14 @@ pytest tests the `parse_...` functions and the API endpoint with saved JSON repl
 - `tests/test_frontend.py`: 5 tests using Streamlit's built-in `AppTest` (runs the page without
   a browser) with `requests.get` faked: backend down, backend too slow, invalid hash, a 404
   reply doesn't crash the page, one failed source still shows all three sections.
-- `tests/test_cache.py`: tests with fake lookups that count their calls (a miss, a hit, an expired
-  entry using a fake clock, an error that is not cached, "not found" is cached, "not found" expires
-  sooner than a found answer for each source, the cache never holds more than `MAX_ENTRIES`,
-  spellings share one entry while different hashes and sources never do, the answer body is the same
-  on a miss, a hit and a partial hit, the page note matches the expiry times). `tests/conftest.py`
-  empties the cache before every test.
+- `tests/test_cache.py`: 7 tests of the cache as the backend uses it, with fake lookups that count
+  their calls (a miss, a hit, an expired entry using a fake clock, an error that is not cached,
+  "not found" is cached, spellings share one entry while different hashes and sources never do, the
+  answer body is the same on a miss, a hit and a partial hit).
+- `tests/test_cache_rules.py`: 5 tests of the cache's own rules, calling `cache.put`/`cache.get`
+  directly ("not found" expires sooner than a found answer, once per source; the cache never holds
+  more than `MAX_ENTRIES`; the page note matches the expiry times).
+- `tests/conftest.py` empties the cache before every test.
 - Known warning: Starlette says its test client will move from `httpx` to `httpx2`. Tests still
   pass; revisit when upgrading.
 
