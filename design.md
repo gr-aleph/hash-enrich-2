@@ -36,6 +36,12 @@ Browser -> Streamlit page (127.0.0.1:8501) -> FastAPI backend (127.0.0.1:8000) -
 
 Style: plain functions and dicts, `requests` library, no classes, no async, no Pydantic.
 Files stay under ~120 lines with a plain-English comment above each function.
+Exceptions for the MCP server only, approved by the owner on 2026-11-09: the `mcp` library
+(`mcp_server/requirements.txt`); Pydantic's `Field`, used only to describe the tool's argument
+(`mcp_server/server.py`); async in the MCP tests, because the SDK's test client is async; one class
+(`Handler`) for the stand-in portal in `tests/test_mcp_stdio.py`, because Python's built-in web
+server needs one; and the shared test helper module `tests/mcp_helpers.py`. The backend and the
+page still follow the rule above.
 Fixed settings (backend address, 10 second timeout) are constants at the top of the file.
 
 Calling sources at the same time: `main.py` keeps a `SOURCES` dict (name -> lookup function)
