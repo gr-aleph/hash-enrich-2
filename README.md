@@ -85,7 +85,31 @@ The tests use saved replies in `tests/fixtures`, so they need no internet and no
 .venv\Scripts\python -m pytest -v
 ```
 
-You should see `34 passed`. A warning about `httpx2` is expected and harmless.
+You should see `40 passed`. A warning about `httpx2` is expected and harmless.
+
+## Caching
+
+Each source's answer is kept in memory for a while, so asking about the same hash again does not
+call the source again (VirusTotal's free key allows only 4 lookups a minute and 500 a day):
+VirusTotal 30 minutes, MalwareBazaar 6 hours, ThreatFox 1 hour; "not found" 5 to 10 minutes; an
+error is never kept. The reasons for each time are in [design.md](design.md), section "Caching".
+For a source that came from the cache, the backend adds a response header `X-Cache-Age-<source>`
+(the seconds since it was fetched; no header means it was just fetched) and the page says
+"Cached result, fetched 7 min ago." The JSON answer itself is unchanged. The cache is empty
+again when the backend restarts.
+
+### Count the outbound requests (the fixed run)
+
+```
+.venv\Scripts\python bench\run_benchmark.py before
+.venv\Scripts\python bench\run_benchmark.py after
+.venv\Scripts\python bench\run_benchmark.py compare
+```
+
+It sends the same 24 lookups through the app with a fake web instead of the real sources, so it
+needs no keys and spends no quota. `before` is meant to be run on the code without the cache
+(the saved `bench/results/before.json` was: 66 requests); with the cache `after` gives 18.
+`compare` prints both tables and checks that every answer is unchanged.
 
 ## Project files
 
@@ -95,6 +119,8 @@ You should see `34 passed`. A warning about `httpx2` is expected and harmless.
 | `backend/virustotal.py` | Calls VirusTotal and turns its reply into a result |
 | `backend/malwarebazaar.py` | Same for MalwareBazaar |
 | `backend/threatfox.py` | Same for ThreatFox |
+| `backend/cache.py` | The in-memory cache (what is kept, and for how long) |
 | `frontend/app.py` | The Streamlit page |
+| `bench/` | The fixed run that counts outbound requests, and its saved results |
 | `tests/` | pytest tests and saved replies |
 | `.streamlit/config.toml` | Keeps the page local (127.0.0.1) |
