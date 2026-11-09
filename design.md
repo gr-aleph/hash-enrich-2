@@ -7,8 +7,8 @@ VirusTotal, MalwareBazaar and ThreatFox know about it, on one page.
 
 ## Out of scope
 
-Database, privacy guard, bulk lookups, file upload, login, verdict badge,
-dark theme, summary card. The app **never uploads files**; it only looks up hashes.
+Database, privacy guard, bulk lookups, file upload, login,
+dark theme, summary card. (A verdict was out of scope until the `feat/verdict` branch; see "Verdict" below.) The app **never uploads files**; it only looks up hashes.
 (Caching was out of scope until Milestone 3; see "Caching" below.)
 
 ## Architecture
@@ -26,6 +26,7 @@ Browser -> Streamlit page (127.0.0.1:8501) -> FastAPI backend (127.0.0.1:8000) -
 | `backend/main.py` | FastAPI app: `/api/v1/health` and `/api/v1/hash/{hash}`; loads `.env`; asks all sources at the same time |
 | `backend/virustotal.py`, `malwarebazaar.py`, `threatfox.py` | One file per source, each with a `lookup_...` function (calls the API) and a `parse_...` function (turns the reply into a result) |
 | `backend/cache.py` | A small in-memory cache for source results, one expiry per source (see "Caching") |
+| `backend/verdict.py` | `make_verdict(sources)`: the overall verdict, worked out from the source results with no network (see "Verdict") |
 | `frontend/app.py` | The Streamlit page |
 | `mcp_server/server.py` | The MCP server: one tool that asks the portal about a hash (see "MCP server") |
 | `tests/` | pytest tests; saved replies in `tests/fixtures/<source>/{hit,unknown,bad_key}.json` |
@@ -71,7 +72,8 @@ arrived in time is stored. Details, expiry times and reasons: see "Caching" belo
 ```json
 {"hash": "...", "hash_type": "sha256",
  "sources": {"virustotal": {"status": "ok", "data": {...}, "error": null},
-             "malwarebazaar": {...}, "threatfox": {...}}}
+             "malwarebazaar": {...}, "threatfox": {...}},
+ "verdict": {"score": 90, "label": "malicious", "reasons": ["..."], "failed_sources": []}}
 ```
 
 Invalid hash -> `400 {"error": "Expected 32, 40 or 64 hex characters"}`, no source is called.
@@ -95,6 +97,41 @@ One failing source never hides the others. "Not found" does not mean "safe".
 | `error` (bad key) | HTTP 401 | HTTP 403 `unknown_auth_key` | HTTP 403 `unknown_auth_key` |
 | `error` (rate limit) | HTTP 429 (free: 4/min, 500/day) | HTTP 429 | HTTP 429 |
 | `error` (other) | missing key (no request sent), timeout, no connection, any other reply | same | same |
+
+## Verdict
+
+**Why.** The analyst had to read three sections and judge alone. The verdict gives one overall
+answer, with the reasons, while the three sections stay exactly as they were.
+
+**Shape.** `verdict` is added after `sources`; no existing field changed. `score` is a whole number
+0-100, `label` is `malicious`, `suspicious` or `unknown`, `reasons` is a list of short texts, and
+`failed_sources` lists the names of the sources whose status is `error`.
+
+**Rules.** Each source that found the hash (`ok`) gives a score; the verdict's score is the highest.
+
+| Source (`ok`) | Score |
+|---|---|
+| VirusTotal | 5+ engines say malicious: 90; 1-4 malicious: 60; 0 malicious and 1+ suspicious: 40; otherwise 0 |
+| MalwareBazaar | 90 (it only stores malware samples) |
+| ThreatFox | the highest `confidence_level` of its matches, but at least 40 (any match is at least suspicious) |
+
+Label: 75-100 `malicious`, 40-74 `suspicious`, 0-39 `unknown`. A missing count or confidence is
+treated as described in `backend/verdict.py` and never crashes the answer.
+
+**Honest by design.** The score measures evidence of harm, not safety, so there is no "clean" label:
+a hash no source knows gets 0 and `unknown`, with the reason "This does not mean it is safe".
+VirusTotal with no detections says the same. A source that failed is listed in `failed_sources` and
+gets the reason "<source> failed, so this verdict may be incomplete"; the sources that answered
+still count (a MalwareBazaar hit stays malicious when ThreatFox timed out).
+
+**Pure.** `make_verdict` only reads the `sources` dict it is given (no network, no cache), so the
+tests call it with small hand-made dicts. It is worked out on every answer, cached sources or not.
+
+**Page.** A coloured box above the three sections: red (malicious), yellow (suspicious) or blue
+(unknown), with "LABEL - score N/100" and the reasons as bullets. No new heading. If the answer has
+no `verdict` (an older backend), the box is skipped.
+
+**Not changed.** The MCP server still passes on only `hash`, `hash_type` and `sources`.
 
 ## Data sources
 
@@ -151,8 +188,7 @@ then the oldest). Two identical requests arriving at the same moment both ask th
 **Telling the analyst a result may be old.** Results can be kept for up to 6 hours, and a cached "not found"
 or clean-looking answer can be wrong later (the file gets submitted, engines update). The page therefore shows
 one fixed note under the results: "Results may be up to 30 min (VirusTotal), 6 h (MalwareBazaar) or 1 h
-(ThreatFox) old." The backend adds nothing to its answer (no new field and no header), so the API is exactly
-as the API section describes it. Cost: the page does not say which result was cached, only how old one can be.
+(ThreatFox) old." The cache adds nothing to the answer (no field and no header). Cost: the page does not say which result was cached, only how old one can be.
 A test checks that the note matches the expiry times in `backend/cache.py`.
 
 **What did not change.** The JSON body, every field, the status codes, and the order of the sources. A valid
@@ -216,8 +252,8 @@ pytest tests the `parse_...` functions and the API endpoint with saved JSON repl
   no keys. abuse.ch replies are real recordings; the VirusTotal bad-key reply was recorded with
   the fake key `not-a-real-key`.
 - `tests/test_parse.py`: 9 tests, 3 per source.
-- `tests/test_api.py`: 5 tests (health, 400, all found, one failing source doesn't hide the
-  others, a crashing lookup becomes an error). They replace the entries in `main.SOURCES` with
+- `tests/test_api.py`: 6 tests (health, 400, all found, one failing source doesn't hide the
+  others, a crashing lookup becomes an error, the answer has a verdict). They replace the entries in `main.SOURCES` with
   fakes using pytest's built-in `monkeypatch`, so no source is ever called.
 - `tests/test_<source>_lookup.py` (one per source, 3 tests each): `requests.get`/`post` is
   replaced with a fake that records what it was asked to send. Checks: a missing key sends
@@ -226,9 +262,10 @@ pytest tests the `parse_...` functions and the API endpoint with saved JSON repl
 - `tests/test_main.py`: 6 tests (md5/sha1/sha256 by length, wrong lengths and non-hex rejected,
   an invalid hash calls no source, the three sources are asked at the same time, a slow source
   gets "Took longer" while the others still answer).
-- `tests/test_frontend.py`: 5 tests using Streamlit's built-in `AppTest` (runs the page without
+- `tests/test_frontend.py`: 6 tests using Streamlit's built-in `AppTest` (runs the page without
   a browser) with `requests.get` faked: backend down, backend too slow, invalid hash, a 404
-  reply doesn't crash the page, one failed source still shows all three sections.
+  reply doesn't crash the page, one failed source still shows all three sections, a malicious
+  verdict shows a red box with the score.
 - `tests/test_cache.py`: 7 tests of the cache as the backend uses it, with fake lookups that count
   their calls (a miss, a hit, an expired entry using a fake clock, an error that is not cached,
   "not found" is cached, spellings share one entry while different hashes and sources never do, the
@@ -236,6 +273,9 @@ pytest tests the `parse_...` functions and the API endpoint with saved JSON repl
 - `tests/test_cache_rules.py`: 5 tests of the cache's own rules, calling `cache.put`/`cache.get`
   directly ("not found" expires sooner than a found answer, once per source; the cache never holds
   more than `MAX_ENTRIES`; the page note matches the expiry times).
+- `tests/test_verdict.py`: 12 tests of `make_verdict` with hand-made results (each VirusTotal rule,
+  a MalwareBazaar hit alone, ThreatFox high, low and missing confidence, the highest wins, not found
+  anywhere, one failed source with a hit elsewhere, all three failed).
 - `tests/conftest.py` empties the cache before every test.
 - Known warning: Starlette says its test client will move from `httpx` to `httpx2`. Tests still
   pass; revisit when upgrading.
@@ -263,3 +303,9 @@ counted before and after (numbers kept, script not in the repo); merged by pull 
 portal; it refuses invalid hashes before any request, turns every expected failure into a clear message, keeps no
 key and prints nothing but the protocol; offline tests; added to Claude Desktop and tried with a real question;
 merged by pull request that the owner reviews.
+
+**Verdict** (branch `feat/verdict`): the answer gets a `verdict` (score 0-100, label, reasons, failed
+sources) worked out by one pure function; no "clean" label; failed sources are named; the page shows a
+coloured box; existing fields unchanged; the existing tests pass (only the cache test that lists the
+answer's keys now expects `verdict` too) and new tests cover every rule; merged by pull request that the
+owner reviews.

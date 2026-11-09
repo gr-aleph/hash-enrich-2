@@ -99,7 +99,7 @@ def test_the_answer_body_is_the_same_on_a_miss_a_hit_and_a_partial_hit(monkeypat
     cache.put("threatfox", MIRAI, FOUND)  # only the LAST source is cached (it must not jump to the front)
     partial = ask(MIRAI)
     assert hit.text == miss.text == partial.text
-    assert list(partial.json()) == ["hash", "hash_type", "sources"]
+    assert list(partial.json()) == ["hash", "hash_type", "sources", "verdict"]
     assert list(partial.json()["sources"]) == ["virustotal", "malwarebazaar", "threatfox"]
 
 

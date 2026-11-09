@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from backend import cache
 from backend.malwarebazaar import lookup_malwarebazaar
 from backend.threatfox import lookup_threatfox
+from backend.verdict import make_verdict
 from backend.virustotal import lookup_virustotal
 
 # Read the API keys from the .env file into os.environ (once, when the backend starts)
@@ -82,7 +83,7 @@ def health():
     return {"status": "ok"}
 
 
-# Look up one hash and return what each source knows about it.
+# Look up one hash and return what each source knows about it, plus an overall verdict.
 @app.get("/api/v1/hash/{file_hash}")
 def lookup_hash(file_hash: str):
     file_hash = file_hash.lower()
@@ -90,8 +91,10 @@ def lookup_hash(file_hash: str):
     if hash_type is None:
         return JSONResponse(status_code=400, content={"error": "Expected 32, 40 or 64 hex characters"})
 
+    sources = ask_all_sources(file_hash)
     return {
         "hash": file_hash,
         "hash_type": hash_type,
-        "sources": ask_all_sources(file_hash),
+        "sources": sources,
+        "verdict": make_verdict(sources),  # added after "sources"; see design.md, "Verdict"
     }

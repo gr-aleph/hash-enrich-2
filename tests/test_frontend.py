@@ -84,3 +84,19 @@ def test_one_failed_source_still_shows_all_three(monkeypatch):
     page = look_up(MIRAI)
     assert [heading.value for heading in page.subheader] == ["VirusTotal", "MalwareBazaar", "ThreatFox"]
     assert page.error[0].value == "Took longer than 12 seconds"
+
+
+# Fake requests.get: a normal answer with a malicious verdict.
+def backend_answers_with_verdict(url, **options):
+    verdict = {"score": 90, "label": "malicious", "reasons": ["MalwareBazaar has this file"],
+               "failed_sources": []}
+    body = {"hash": MIRAI, "hash_type": "sha256", "verdict": verdict,
+            "sources": {"virustotal": NOT_FOUND, "malwarebazaar": NOT_FOUND, "threatfox": NOT_FOUND}}
+    return SimpleNamespace(status_code=200, json=lambda: body)
+
+
+def test_a_malicious_verdict_shows_a_red_box_with_the_score(monkeypatch):
+    monkeypatch.setattr(requests, "get", backend_answers_with_verdict)
+    page = look_up(MIRAI)
+    assert "MALICIOUS** - score 90/100" in page.error[0].value
+    assert "MalwareBazaar has this file" in page.error[0].value
