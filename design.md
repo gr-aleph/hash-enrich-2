@@ -152,7 +152,7 @@ tests call it with small hand-made dicts. It is worked out on every answer, cach
 (safe), with "LABEL - score N/100" and the reasons as bullets. No new heading. If the answer has
 no `verdict` (an older backend), the box is skipped.
 
-**Not changed.** The MCP server still passes on only `hash`, `hash_type` and `sources`.
+**MCP server.** Since branch `feat/mcp-verdict` the MCP tool passes the verdict on too (see "MCP server").
 
 ## Data sources
 
@@ -251,18 +251,28 @@ of internal files must not be looked up.
 spaces and lowercasing) is a tool error and nothing is sent. The bad value is not repeated back.
 
 **Failures.** Portal not running, no answer in 20 seconds (longer than the portal's own 12), a reply that is
-not JSON, any status other than 200 and 400, and an unexpected shape each become a clear tool error. A
+not JSON, any status other than 200 and 400, and an unexpected shape each become a clear tool error. An answer without a `verdict` is one too: every
+portal since the verdict sends one, so its absence means the portal is still running older code, and the
+message says "Restart the portal and try again" instead of answering without a verdict. A
 source that fails is NOT a tool error: it comes through as that source's `error` result.
 
-**Output.** The portal's `hash`, `hash_type` and `sources`, with every text cut to 200 characters and every
-list to 10 items, because whatever a source wrote reaches the model.
+**Output.** The portal's `hash`, `hash_type`, `verdict` and `sources`, with every text cut to 200 characters and
+every list to 10 items, because whatever a source wrote reaches the model (a verdict reason can hold
+MalwareBazaar's signature, so the verdict is cut too). The tool description explains the verdict so the model
+gives the analyst context: the scale (0 safe, 100 malicious), that 50 means no source knows the hash and is not
+a 50% chance, what safe needs, and that the model must give the label and score with the reasons, mention
+failed sources, and never call a file safe or malicious from the score alone.
 
 **Logs.** To stderr only, never the hash itself. stdout carries the protocol, so the server never prints.
 
 **Tests** (`tests/test_mcp_*.py`, offline): recorded real portal answers (`tests/fixtures/portal/`, made by running the real backend with the saved source replies of `tests/fixtures/`, and the source error and the 400 as the backend gives them); the tool
 list and annotations; found, nothing known, one source failing, invalid values (no request is made), portal
 down, slow, 400, not JSON; and one test that starts the real server and checks that every line on stdout is a
-protocol message. The server needs its own packages: `pip install -r mcp_server/requirements.txt`.
+protocol message; the verdict in a normal answer, a not-found answer (50, suspicious) and an answer with a failed
+source; a long verdict reason is cut; an answer without a verdict says to restart the portal. The three 200
+recordings got their `verdict` afterwards: a one-off script (not in the repository) ran `make_verdict` from
+`backend/verdict.py` on each recording's `sources`, exactly as `backend/main.py` does, and nothing else in them
+changed. The server needs its own packages: `pip install -r mcp_server/requirements.txt`.
 
 ## Testing
 
@@ -379,7 +389,7 @@ labels safe / suspicious / malicious with ranges 0-29 / 30-69 / 70-100; an unkno
 safe needs 30+ clean VirusTotal engines and all sources answering; tests rewritten for the new rules;
 merged by pull request that the owner reviews.
 
-**Milestone 6** (branch `feat/hash-triage-skill`): a Skill, `hash-triage`, that triages a list of hashes with the MCP tool and
-reports a verdict per hash in a fixed table; the rules for each verdict are written down and were checked on real answers; a
-refused value and a failing source do not stop the list; run on at least five values including an invalid one; merged by pull
-request that the owner reviews.
+**MCP verdict** (branch `feat/mcp-verdict`): the MCP tool returns the portal's verdict (cut like other text) and
+its description explains the scale and how to present it; an answer without a verdict is a tool error that says to
+restart the portal; the recorded portal answers include the verdict; all tests pass with the MCP package installed;
+merged by pull request that the owner reviews.

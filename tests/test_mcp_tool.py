@@ -25,7 +25,8 @@ def test_the_tool_is_listed_with_a_name_a_description_and_a_schema():
     tools = asyncio.run(run())
     assert [tool.name for tool in tools] == ["lookup_hash"]
     tool = tools[0]
-    for word in ("VirusTotal", "MalwareBazaar", "ThreatFox", "not_found", "refused", "confidential"):
+    for word in ("VirusTotal", "MalwareBazaar", "ThreatFox", "not_found", "refused", "confidential",
+                 "verdict", "not a 50% chance", "never call a file safe or malicious"):
         assert word in tool.description
     assert tool.input_schema["required"] == ["file_hash"]
     description = tool.input_schema["properties"]["file_hash"]["description"]  # the model reads this to know what to pass
@@ -41,6 +42,7 @@ def test_a_normal_answer_has_the_hash_its_type_and_the_three_sources(monkeypatch
     assert (answer["hash"], answer["hash_type"]) == (MIRAI, "sha256")
     assert {name: block["status"] for name, block in answer["sources"].items()} == {
         "virustotal": "ok", "malwarebazaar": "ok", "threatfox": "ok"}
+    assert answer["verdict"]["label"] == "malicious"
     assert asked == [PORTAL_ADDRESS]
 
 
@@ -48,14 +50,17 @@ def test_not_found_is_an_answer_not_a_tool_error(monkeypatch):
     monkeypatch.setattr(requests, "get", portal_gives("not_found")[0])
     answer = answer_of(call_tool("0" * 64))
     assert {block["status"] for block in answer["sources"].values()} == {"not_found"}
+    assert (answer["verdict"]["score"], answer["verdict"]["label"]) == (50, "suspicious")
 
 
 def test_one_failing_source_is_passed_through_and_the_others_still_answer(monkeypatch):
     monkeypatch.setattr(requests, "get", portal_gives("one_source_error")[0])
-    sources = answer_of(call_tool("1" * 40))["sources"]
+    answer = answer_of(call_tool("1" * 40))
+    sources = answer["sources"]
     assert sources["threatfox"]["status"] == "error"
     assert "API key" in sources["threatfox"]["error"]
     assert sources["virustotal"]["status"] == "ok"
+    assert answer["verdict"]["failed_sources"] == ["threatfox"]
 
 
 def test_the_hash_is_cleaned_before_it_is_sent(monkeypatch):
@@ -82,3 +87,11 @@ def test_long_text_and_long_lists_from_a_source_are_cut(monkeypatch):
     names = answer_of(call_tool(MIRAI))["sources"]["virustotal"]["data"]["names"]
     assert len(names) == server.MAX_ITEMS
     assert len(names[0]) == server.MAX_TEXT + 3 and names[0].endswith("...")
+
+
+def test_a_long_reason_in_the_verdict_is_cut_too(monkeypatch):
+    body = json.loads(json.dumps(recorded("found")[1]))
+    body["verdict"]["reasons"] = ["MalwareBazaar has this file as a malware sample (" + "x" * 5000 + ")"]
+    monkeypatch.setattr(requests, "get", lambda url, **options: SimpleNamespace(status_code=200, json=lambda: body))
+    reason = answer_of(call_tool(MIRAI))["verdict"]["reasons"][0]
+    assert len(reason) == server.MAX_TEXT + 3 and reason.endswith("...")
