@@ -1,0 +1,132 @@
+{
+  "label": "after",
+  "lookups_made": 24,
+  "requests_per_source": {
+    "virustotal": 5,
+    "malwarebazaar": 5,
+    "threatfox": 8
+  },
+  "requests_total": 18,
+  "lookups": [
+    {
+      "typed": "add97f691f8b...",
+      "status": 200,
+      "answer": "37ddbcf206cf"
+    },
+    {
+      "typed": "add97f691f8b...",
+      "status": 200,
+      "answer": "37ddbcf206cf"
+    },
+    {
+      "typed": "ADD97F691F8B...",
+      "status": 200,
+      "answer": "37ddbcf206cf"
+    },
+    {
+      "typed": "ADD97F691F8B...",
+      "status": 200,
+      "answer": "37ddbcf206cf"
+    },
+    {
+      "typed": "44d88612fea8...",
+      "status": 200,
+      "answer": "1a6c4c0b35b8"
+    },
+    {
+      "typed": "44d88612fea8...",
+      "status": 200,
+      "answer": "1a6c4c0b35b8"
+    },
+    {
+      "typed": "44D88612FEA8...",
+      "status": 200,
+      "answer": "1a6c4c0b35b8"
+    },
+    {
+      "typed": "000000000000...",
+      "status": 200,
+      "answer": "fec577529a02"
+    },
+    {
+      "typed": "000000000000...",
+      "status": 200,
+      "answer": "fec577529a02"
+    },
+    {
+      "typed": "000000000000...",
+      "status": 200,
+      "answer": "fec577529a02"
+    },
+    {
+      "typed": "111111111111...",
+      "status": 200,
+      "answer": "a581c1e8c67d"
+    },
+    {
+      "typed": "111111111111...",
+      "status": 200,
+      "answer": "a581c1e8c67d"
+    },
+    {
+      "typed": "111111111111...",
+      "status": 200,
+      "answer": "a581c1e8c67d"
+    },
+    {
+      "typed": "add97f691f8b...",
+      "status": 200,
+      "answer": "37ddbcf206cf"
+    },
+    {
+      "typed": "44d88612fea8...",
+      "status": 200,
+      "answer": "1a6c4c0b35b8"
+    },
+    {
+      "typed": "abc...",
+      "status": 400,
+      "answer": "3303e7684f6c"
+    },
+    {
+      "typed": "%2044d88612f...",
+      "status": 400,
+      "answer": "3303e7684f6c"
+    },
+    {
+      "typed": "ADD97F691F8B...",
+      "status": 200,
+      "answer": "37ddbcf206cf"
+    },
+    {
+      "typed": "d41d8cd98f00...",
+      "status": 200,
+      "answer": "ef792fcddebd"
+    },
+    {
+      "typed": "d41d8cd98f00...",
+      "status": 200,
+      "answer": "ef792fcddebd"
+    },
+    {
+      "typed": "D41D8CD98F00...",
+      "status": 200,
+      "answer": "ef792fcddebd"
+    },
+    {
+      "typed": "add97f691f8b...",
+      "status": 200,
+      "answer": "37ddbcf206cf"
+    },
+    {
+      "typed": "111111111111...",
+      "status": 200,
+      "answer": "a581c1e8c67d"
+    },
+    {
+      "typed": "000000000000...",
+      "status": 200,
+      "answer": "fec577529a02"
+    }
+  ]
+}

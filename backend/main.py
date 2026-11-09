@@ -5,9 +5,10 @@
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.responses import JSONResponse
 
+from backend import cache
 from backend.malwarebazaar import lookup_malwarebazaar
 from backend.threatfox import lookup_threatfox
 from backend.virustotal import lookup_virustotal
@@ -40,14 +41,24 @@ def get_hash_type(file_hash):
 
 
 # Ask all sources at the same time (one thread each) and collect their results.
+# A source whose answer is already in the cache (cache.py) is not asked again. If you pass in a
+# dictionary as `ages`, it is filled with {source: seconds since the cached answer was fetched}.
 # We wait at most TOTAL_WAIT_SECONDS. A source that is still busy then gets an error,
 # so one slow source never holds back the others.
 # If one source crashes, only that source shows an error; the others still answer.
-def ask_all_sources(file_hash):
+def ask_all_sources(file_hash, ages=None):
     results = {}
     pool = ThreadPoolExecutor()
-    # Start every lookup without waiting for the previous one to finish
-    running = {name: pool.submit(lookup, file_hash) for name, lookup in SOURCES.items()}
+    running = {}
+    for name, lookup in SOURCES.items():
+        cached = cache.get(name, file_hash)
+        if cached is not None:
+            results[name], age = cached
+            if ages is not None:
+                ages[name] = age
+        else:
+            # Start every lookup without waiting for the previous one to finish
+            running[name] = pool.submit(lookup, file_hash)
     # Wait at most TOTAL_WAIT_SECONDS, then see which lookups are done
     finished, not_finished = wait(running.values(), timeout=TOTAL_WAIT_SECONDS)
     for name, job in running.items():
@@ -60,9 +71,12 @@ def ask_all_sources(file_hash):
         except Exception as problem:
             results[name] = {"status": "error", "data": None,
                              "error": f"Unexpected problem: {type(problem).__name__}"}
+        else:
+            cache.put(name, file_hash, results[name])  # keeps a found or not-found answer, never an error
     # Answer now; a slow lookup may still finish in the background, and its result is ignored
     pool.shutdown(wait=False)
-    return results
+    # Always return the sources in the same order, whether they came from the cache or not
+    return {name: results[name] for name in SOURCES}
 
 
 # Health check: lets you (or a script) see that the backend is running.
@@ -73,14 +87,21 @@ def health():
 
 # Look up one hash and return what each source knows about it.
 @app.get("/api/v1/hash/{file_hash}")
-def lookup_hash(file_hash: str):
+def lookup_hash(file_hash: str, response: Response):
     file_hash = file_hash.lower()
     hash_type = get_hash_type(file_hash)
     if hash_type is None:
         return JSONResponse(status_code=400, content={"error": "Expected 32, 40 or 64 hex characters"})
 
+    ages = {}
+    sources = ask_all_sources(file_hash, ages)
+    # Say which sources came from the cache, one header each, e.g.  X-Cache-Age-virustotal: 412
+    # (fetched 412 seconds ago). A source with no such header was just fetched.
+    # The answer's body does not change. See design.md, section "Caching".
+    for name, age in ages.items():
+        response.headers[f"X-Cache-Age-{name}"] = str(age)
     return {
         "hash": file_hash,
         "hash_type": hash_type,
-        "sources": ask_all_sources(file_hash),
+        "sources": sources,
     }
