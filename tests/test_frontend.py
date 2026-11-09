@@ -100,3 +100,18 @@ def test_a_malicious_verdict_shows_a_red_box_with_the_score(monkeypatch):
     page = look_up(MIRAI)
     assert "MALICIOUS** - score 90/100" in page.error[0].value
     assert "MalwareBazaar has this file" in page.error[0].value
+
+
+# Fake requests.get: a normal answer with a safe verdict.
+def backend_answers_safe(url, **options):
+    verdict = {"score": 0, "label": "safe", "reasons": ["VirusTotal: none of 60 engines flags it"],
+               "failed_sources": []}
+    body = {"hash": MIRAI, "hash_type": "sha256", "verdict": verdict,
+            "sources": {"virustotal": NOT_FOUND, "malwarebazaar": NOT_FOUND, "threatfox": NOT_FOUND}}
+    return SimpleNamespace(status_code=200, json=lambda: body)
+
+
+def test_a_safe_verdict_shows_a_green_box_with_the_score(monkeypatch):
+    monkeypatch.setattr(requests, "get", backend_answers_safe)
+    page = look_up(MIRAI)
+    assert "SAFE** - score 0/100" in page.success[0].value
