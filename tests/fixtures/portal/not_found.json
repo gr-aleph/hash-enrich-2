@@ -19,6 +19,14 @@
         "data": null,
         "error": null
       }
+    },
+    "verdict": {
+      "score": 50,
+      "label": "suspicious",
+      "reasons": [
+        "No source knows this hash. Not being known is not proof it is safe, so it needs checking."
+      ],
+      "failed_sources": []
     }
   }
 }
