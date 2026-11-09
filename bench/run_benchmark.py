@@ -62,7 +62,7 @@ ANSWERS = {
     OTHER: ("unknown", "unknown", "unknown"),
 }
 
-# The fixed run: 24 lookups. Repeats, one hash in four spellings, an error that repeats, invalid input.
+# The fixed run: 24 lookups. Repeats, one hash in three spellings (lower, UPPER, mixed case), an error that repeats, invalid input.
 RUN = [
     MIRAI, MIRAI, MIRAI.upper(), MIRAI[:32].upper() + MIRAI[32:],
     EICAR, EICAR, EICAR.upper(),

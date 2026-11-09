@@ -156,7 +156,7 @@ cached. These headers are an addition and are documented here, not in the API se
 hash still always gets 200. An invalid hash still gets 400 before the cache or any source is touched.
 
 **Measured.** `bench/run_benchmark.py` sends the same 24 lookups through the app before and after the cache
-(22 valid lookups: repeats, one hash in four spellings, hashes known to nobody, one hash for which ThreatFox
+(22 valid lookups: repeats, one hash in three spellings (lower case, UPPER CASE, mixed case), hashes known to nobody, one hash for which ThreatFox
 fails every time, and 2 invalid inputs that get a 400). A fake replaces `requests.get` and `requests.post` and
 answers from `tests/fixtures`, real network connections are switched off and the keys are dummy values, so no
 real quota is spent. It counts the outbound requests each source would have received:
