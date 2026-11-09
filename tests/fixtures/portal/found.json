@@ -53,6 +53,16 @@
         },
         "error": null
       }
+    },
+    "verdict": {
+      "score": 90,
+      "label": "malicious",
+      "reasons": [
+        "VirusTotal: 49 engines say malicious",
+        "MalwareBazaar has this file as a malware sample (Mirai)",
+        "ThreatFox lists this hash as an indicator (score 90)"
+      ],
+      "failed_sources": []
     }
   }
 }

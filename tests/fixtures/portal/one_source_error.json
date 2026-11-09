@@ -33,6 +33,17 @@
         "data": null,
         "error": "ThreatFox rejected the API key (HTTP 403)"
       }
+    },
+    "verdict": {
+      "score": 90,
+      "label": "malicious",
+      "reasons": [
+        "VirusTotal: 49 engines say malicious",
+        "ThreatFox failed, so this verdict may be incomplete."
+      ],
+      "failed_sources": [
+        "threatfox"
+      ]
     }
   }
 }

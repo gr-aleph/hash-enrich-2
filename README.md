@@ -103,7 +103,7 @@ The tests use saved replies in `tests/fixtures`, so they need no internet and no
 .venv\Scripts\python -m pytest -v
 ```
 
-You should see `85 passed`. If you have not installed the MCP server's packages, the 22 MCP tests are skipped and you see `63 passed, 3 skipped` (3 test files skipped). A warning about `httpx2` is expected and harmless.
+You should see `87 passed`. If you have not installed the MCP server's packages, the 24 MCP tests are skipped and you see `63 passed, 3 skipped` (3 test files skipped). A warning about `httpx2` is expected and harmless.
 
 ## Caching
 
@@ -143,6 +143,9 @@ settings in the file) and change the two paths to yours (full paths, not relativ
 
 On a Mac the command is `/path/to/hash-enrich-2/.venv/bin/python`. Quit Claude Desktop completely and open
 it again. Then ask, for example: "Look up this hash: add97f691f8bd8af5efe0480a90f12bcdcfa089f7432088b4ff8bd0606ff58de".
+The answer includes the portal's verdict (score 0 = safe to 100 = malicious, label and reasons), and
+Claude is told to give the reasons and never judge a file from the score alone. If Claude says the portal
+"sent no verdict", the portal is running older code: stop it and start it again.
 The server holds no API key; the keys stay in the portal's `.env`. Lookups go to outside services, so never
 ask about hashes of internal files. Details: [design.md](design.md), section "MCP server".
 

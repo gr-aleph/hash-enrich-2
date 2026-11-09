@@ -9,7 +9,7 @@ import requests
 # Skip these tests (instead of crashing the whole run) when the MCP package is not installed.
 pytest.importorskip("mcp")
 
-from mcp_helpers import MIRAI, call_tool, error_text, portal_gives
+from mcp_helpers import MIRAI, call_tool, error_text, portal_gives, recorded
 from mcp_server import server
 
 
@@ -51,3 +51,10 @@ def test_an_answer_that_is_not_json_is_a_tool_error(monkeypatch):
 
     monkeypatch.setattr(requests, "get", lambda url, **options: SimpleNamespace(status_code=502, json=not_json))
     assert "not JSON (HTTP 502)" in error_text(call_tool(MIRAI))
+
+
+def test_an_answer_without_a_verdict_says_to_restart_the_portal(monkeypatch):
+    old_body = dict(recorded("found")[1])  # a copy of a normal answer...
+    del old_body["verdict"]  # ...without the verdict, as a portal from before the verdict sends it
+    monkeypatch.setattr(requests, "get", lambda url, **options: SimpleNamespace(status_code=200, json=lambda: old_body))
+    assert "Restart the portal" in error_text(call_tool(MIRAI))
