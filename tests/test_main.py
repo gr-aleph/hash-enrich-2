@@ -25,6 +25,12 @@ def half_second_lookup(file_hash):
     return {"status": "not_found", "data": None, "error": None}
 
 
+# A fake lookup that takes 2 seconds, longer than the time limit used in the test below.
+def two_second_lookup(file_hash):
+    time.sleep(2)
+    return {"status": "not_found", "data": None, "error": None}
+
+
 def test_valid_lengths_give_the_right_type():
     assert get_hash_type("a" * 32) == "md5"
     assert get_hash_type("a" * 40) == "sha1"
@@ -62,3 +68,18 @@ def test_sources_are_asked_at_the_same_time(monkeypatch):
     assert reply.status_code == 200
     # One after another would take 1.5 seconds; at the same time takes about 0.5
     assert took < 1.2
+
+
+def test_slow_source_does_not_hold_back_the_others(monkeypatch):
+    monkeypatch.setattr(main, "TOTAL_WAIT_SECONDS", 0.5)  # a short limit so the test is quick
+    monkeypatch.setitem(main.SOURCES, "virustotal", two_second_lookup)
+    monkeypatch.setitem(main.SOURCES, "malwarebazaar", recording_lookup)
+    monkeypatch.setitem(main.SOURCES, "threatfox", recording_lookup)
+    start = time.time()
+    body = client.get(f"/api/v1/hash/{MIRAI}").json()
+    took = time.time() - start
+    assert body["sources"]["virustotal"]["error"] == "Took longer than 0.5 seconds"
+    assert body["sources"]["malwarebazaar"]["status"] == "not_found"
+    assert body["sources"]["threatfox"]["status"] == "not_found"
+    # The answer came after the 0.5 second limit, without waiting for the 2 second source
+    assert took < 1.5

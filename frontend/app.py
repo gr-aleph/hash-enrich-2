@@ -6,18 +6,25 @@ import requests
 import streamlit as st
 
 BACKEND_URL = "http://127.0.0.1:8000"
-TIMEOUT_SECONDS = 15  # a bit longer than the backend's 10 second source timeout
+TIMEOUT_SECONDS = 20  # longer than the backend's 12 second limit, so the backend answers first
 
 SOURCE_NAMES = {"virustotal": "VirusTotal", "malwarebazaar": "MalwareBazaar", "threatfox": "ThreatFox"}
 
 
-# Ask the backend about a hash. Returns (status_code, body), or (None, None) if the backend is down.
+# Ask the backend about a hash.
+# Returns (status_code, body) when the backend answered,
+# or (None, message) with a message that says what went wrong.
 def ask_backend(file_hash):
     try:
         reply = requests.get(f"{BACKEND_URL}/api/v1/hash/{file_hash}", timeout=TIMEOUT_SECONDS)
+    except requests.ConnectionError:
+        return None, f"Backend not running at {BACKEND_URL}"
+    except requests.Timeout:
+        return None, f"The backend took longer than {TIMEOUT_SECONDS} seconds to answer"
+    try:
         return reply.status_code, reply.json()
-    except requests.RequestException:
-        return None, None
+    except ValueError:
+        return None, f"The backend sent an unexpected reply (HTTP {reply.status_code})"
 
 
 # Show the VirusTotal details on the page.
@@ -74,9 +81,10 @@ file_hash = st.text_input("MD5, SHA-1 or SHA-256 hash").strip()
 if st.button("Look up") and file_hash:
     status_code, body = ask_backend(file_hash)
     if status_code is None:
-        st.error(f"Backend not running at {BACKEND_URL}")
-    elif status_code == 400:
-        st.error(body["error"])
+        st.error(body)  # body is the message from ask_backend
+    elif status_code != 200:
+        # 400 has {"error": "..."}; other codes (like 404 for a hash with "/") may not
+        st.error(body.get("error") or f"The backend answered HTTP {status_code}")
     else:
         st.caption(f"{body['hash_type']}: {body['hash']}")
         for key, result in body["sources"].items():
