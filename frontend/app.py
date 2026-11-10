@@ -8,7 +8,7 @@ import streamlit as st
 BACKEND_URL = "http://127.0.0.1:8000"
 TIMEOUT_SECONDS = 20  # longer than the backend's 12 second limit, so the backend answers first
 
-# The backend keeps answers for a while (design.md, section "Caching"), so a result can be this old.
+# The backend keeps answers for a while (backend/cache.py), so a result can be this old.
 CACHE_NOTE = "Results may be up to 30 min (VirusTotal), 6 h (MalwareBazaar) or 1 h (ThreatFox) old."
 
 SOURCE_NAMES = {"virustotal": "VirusTotal", "malwarebazaar": "MalwareBazaar", "threatfox": "ThreatFox"}

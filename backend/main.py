@@ -96,5 +96,5 @@ def lookup_hash(file_hash: str):
         "hash": file_hash,
         "hash_type": hash_type,
         "sources": sources,
-        "verdict": make_verdict(sources),  # added after "sources"; see design.md, "Verdict"
+        "verdict": make_verdict(sources),  # see design.md, section "API"
     }
