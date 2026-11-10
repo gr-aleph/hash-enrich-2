@@ -1,6 +1,6 @@
 # Shared helpers for the MCP server tests (test_mcp_tool.py, test_mcp_portal_problems.py, test_mcp_stdio.py).
 # No portal needs to be running. The portal's answers are RECORDINGS of its real API, saved in
-# tests/fixtures/portal (how they were made: design.md, section "MCP server"). requests.get is swapped for a
+# tests/fixtures/portal, made by running the real backend on the saved source replies in tests/fixtures. requests.get is swapped for a
 # fake (with monkeypatch) that gives a recording back and writes down every address it was asked for,
 # so nothing goes over the internet and no API key is needed.
 # asyncio.run runs the SDK's Client (which is async) from an ordinary test function.

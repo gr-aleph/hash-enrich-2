@@ -6,12 +6,20 @@
 # never an API key.
 #
 # An "error" result is NEVER kept: a timeout, a 429, a 5xx and a missing key are not answers.
-# The reasons for each expiry are in design.md, section "Caching".
 
 import threading
 import time
 
 # How long each source's answers are kept, in seconds: (when found, when "not found").
+# "Not found" is always kept for less time, because a file or indicator can be added at any moment.
+# - VirusTotal: detection counts change as antivirus engines update, so a found answer is kept for
+#   minutes, not hours. Its free key has the tightest limit of the three, so repeats must not spend it.
+# - MalwareBazaar: facts about a sample (family, file type, first seen) rarely change, so hours are
+#   fresh enough. It publishes only "fair use" limits, and fewer repeated queries fit those.
+# - ThreatFox: indicators are added all the time, their confidence can change, and old indicators
+#   expire from the API, so a long expiry could keep one that is gone.
+# The providers' API pages say nothing about caching. This copy stays in memory, is short-lived and
+# is used only for repeat lookups; it is never written to disk or shared.
 EXPIRY = {
     "virustotal": (30 * 60, 5 * 60),
     "malwarebazaar": (6 * 60 * 60, 10 * 60),

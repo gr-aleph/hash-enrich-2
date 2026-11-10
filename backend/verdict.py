@@ -1,4 +1,4 @@
-# The overall verdict for one hash, worked out from the sources' results (design.md, "Verdict").
+# The overall verdict for one hash, worked out from the sources' results (shape: design.md, section "API").
 # It only reads the results it is given: no network and no cache, so it is easy to test.
 # Fields are read with .get(), so a missing field never crashes the answer (a valid hash always gets 200).
 # Scale: 0 = safe, 100 = malicious. "Safe" needs real proof; a hash nobody knows is suspicious.
